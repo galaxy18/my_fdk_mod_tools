@@ -4,12 +4,14 @@
 #必须按新模型、原模型的顺序选取
 arr_base = [
 #"LeftShoulder","RightShoulder","Spine1",
-"Face_Root"
-]
-arr_names = [
 "Head"
 ]
-arr_ignore=[]
+arr_names = [
+#"Head"
+]
+arr_ignore=[
+#"Head"
+]
 arr_add = [
 #"Bone_hair_tail1",
 #"Bone_Rcloth_front1","Bone_Lcloth_front1","Bone_hipbelt1",
@@ -31,7 +33,7 @@ for (idx, obj) in enumerate(bpy.context.selected_objects):
 import bpy,mathutils,math
 def create_Bone(b_orig):
     if (arm.edit_bones.get(b_orig.name) is None) and (not b_orig.name in arr_add_ignore):
-        print('creating '+b_orig.name)
+        print('    creating '+b_orig.name)
         b = arm.edit_bones.new(b_orig.name)
         b.head = b_orig.head
         b.tail = b_orig.tail
@@ -43,7 +45,7 @@ def create_Bone(b_orig):
         create_Bone(child)
 
 def create_Parent(b_orig):
-    print('Info: creating parent bone '+b_orig.name+' can not be skipped')
+    print('        Info: creating parent bone '+b_orig.name+' can not be skipped')
     if arm.edit_bones.get(b_orig.name) is None:
         b = arm.edit_bones.new(b_orig.name)
         b.head = b_orig.head
@@ -54,11 +56,13 @@ def create_Parent(b_orig):
         b.parent = arm.edit_bones[b_orig.parent.name]
     
 def processname(b_child, processchild=True):
+    changes=mathutils.Vector((0,0,0))
     try:
         if arm.edit_bones.get(b_child.name) is None:
             create_Bone(b_child)
             #print(b_child.name)
         elif not b_child.name in arr_ignore:
+            print("Moving bone "+b_child.name)
             b=arm.edit_bones[b_child.name]
             changes=mathutils.Vector((b.head[0]-b_child.head[0],
                 b.head[1]-b_child.head[1],
@@ -69,12 +73,12 @@ def processname(b_child, processchild=True):
             b.head = b_child.head
             #b.matrix = b_child.matrix
             #b.parent = b_child.parent
-            for obj in bpy.data.objects:
-                if obj.parent_type=='BONE' and obj.parent_bone == b_child.name and obj.type == "EMPTY":
-                    print("Moving EMPTY obj: " + obj.name)
-                    obj.rotation_quaternion = Quaternion([1,0,0,0])
-                    obj.scale = [1.0,1.0,1.0]
-                    obj.location += mathutils.Vector((changes[0], changes[1], changes[2]))
+        for obj in bpy.data.objects:
+            if obj.parent_type=='BONE' and obj.parent_bone == b_child.name and obj.type == "EMPTY":
+                print("    Moving EMPTY obj: " + obj.name)
+                obj.rotation_quaternion = Quaternion([1,0,0,0])
+                obj.scale = [1.0,1.0,1.0]
+                obj.location += mathutils.Vector((changes[0], changes[1], changes[2]))
     except Exception as e: print(e)
     if processchild:
         for child in b_child.children:
