@@ -3,8 +3,9 @@
 #arr_add    用来根据父骨骼添加缺失子骨骼
 #必须按新模型、原模型的顺序选取
 arr_base = [
-#"LeftShoulder","RightShoulder","Spine1",
-"Head"
+"LeftShoulder","RightShoulder",
+#"Spine1",
+#"Head"
 ]
 arr_names = [
 #"Head"
@@ -75,10 +76,10 @@ def processname(b_child, processchild=True):
             #b.parent = b_child.parent
         for obj in bpy.data.objects:
             if obj.parent_type=='BONE' and obj.parent_bone == b_child.name and obj.type == "EMPTY":
-                print("    Moving EMPTY obj: " + obj.name)
+                print("    Moving EMPTY obj: " + obj.name+" "+changes))
                 obj.rotation_quaternion = Quaternion([1,0,0,0])
                 obj.scale = [1.0,1.0,1.0]
-                obj.location += mathutils.Vector((changes[0], changes[1], changes[2]))
+                obj.location += changes
     except Exception as e: print(e)
     if processchild:
         for child in b_child.children:
