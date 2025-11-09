@@ -1,0 +1,10 @@
+#用来清空全部头部骨骼，以便制作脖子以下模型
+headkey="Head"
+arm0= bpy.context.selected_objects[0].data
+bpy.ops.object.mode_set(mode='EDIT')
+bpy.ops.armature.select_all(action='DESELECT')
+arm0.edit_bones.active = arm0.edit_bones[headkey]
+bpy.ops.armature.select_similar(type='CHILDREN')
+bpy.ops.armature.delete()
+bpy.ops.object.mode_set(mode='OBJECT')
+

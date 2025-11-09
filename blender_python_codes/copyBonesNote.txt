@@ -1,0 +1,96 @@
+#arr_base   用来复制骨骼定位，遍历所有子元素
+#arr_names  用来复制骨骼定位，但不处理子元素
+#arr_add    用来根据父骨骼添加缺失子骨骼
+#必须按新模型、原模型的顺序选取
+arr_base = [
+#"LeftShoulder","RightShoulder","Spine1",
+"Face_Root"
+]
+arr_names = [
+"Head"
+]
+arr_ignore=[]
+arr_add = [
+#"Bone_hair_tail1",
+#"Bone_Rcloth_front1","Bone_Lcloth_front1","Bone_hipbelt1",
+#"Bone_swallow_in_root","Bone_Rswallow_out1","Bone_Lswallow_out1",
+#"Head",
+#"Bone_Lleg_belt","Bone_Rleg_belt"
+#"LeftLeg"
+]
+arr_add_ignore=["Bone_eye_root"]
+
+arm0=None#ref
+arm=None#target
+for (idx, obj) in enumerate(bpy.context.selected_objects):
+    if obj.name == bpy.context.active_object.name:
+        arm=bpy.context.selected_objects[idx].data
+    else:
+        arm0=bpy.context.selected_objects[idx].data
+
+import bpy,mathutils,math
+def create_Bone(b_orig):
+    if (arm.edit_bones.get(b_orig.name) is None) and (not b_orig.name in arr_add_ignore):
+        print('creating '+b_orig.name)
+        b = arm.edit_bones.new(b_orig.name)
+        b.head = b_orig.head
+        b.tail = b_orig.tail
+        b.matrix = b_orig.matrix
+        if arm.edit_bones.get(b_orig.parent.name) is None:
+            create_Parent(b_orig.parent)
+        b.parent = arm.edit_bones[b_orig.parent.name]
+    for child in b_orig.children:
+        create_Bone(child)
+
+def create_Parent(b_orig):
+    print('Info: creating parent bone '+b_orig.name+' can not be skipped')
+    if arm.edit_bones.get(b_orig.name) is None:
+        b = arm.edit_bones.new(b_orig.name)
+        b.head = b_orig.head
+        b.tail = b_orig.tail
+        b.matrix = b_orig.matrix
+        if arm.edit_bones.get(b_orig.parent.name) is None:
+            create_Parent(b_orig.parent)
+        b.parent = arm.edit_bones[b_orig.parent.name]
+    
+def processname(b_child, processchild=True):
+    try:
+        if arm.edit_bones.get(b_child.name) is None:
+            create_Bone(b_child)
+            #print(b_child.name)
+        elif not b_child.name in arr_ignore:
+            b=arm.edit_bones[b_child.name]
+            changes=mathutils.Vector((b.head[0]-b_child.head[0],
+                b.head[1]-b_child.head[1],
+                b.head[2]-b_child.head[2]))
+            b.tail = [b.tail[0]-b.head[0]+b_child.head[0],
+                b.tail[1]-b.head[1]+b_child.head[1],
+                b.tail[2]-b.head[2]+b_child.head[2]]
+            b.head = b_child.head
+            #b.matrix = b_child.matrix
+            #b.parent = b_child.parent
+            for obj in bpy.data.objects:
+                if obj.parent_type=='BONE' and obj.parent_bone == b_child.name and obj.type == "EMPTY":
+                    print("Moving EMPTY obj: " + obj.name)
+                    obj.rotation_quaternion = Quaternion([1,0,0,0])
+                    obj.scale = [1.0,1.0,1.0]
+                    obj.location += mathutils.Vector((changes[0], changes[1], changes[2]))
+    except Exception as e: print(e)
+    if processchild:
+        for child in b_child.children:
+            processname(child)
+
+bpy.ops.object.mode_set(mode='EDIT')
+for basename in arr_base:
+    processname(arm0.edit_bones[basename])
+    
+for basename in arr_names:
+    processname(arm0.edit_bones[basename],False)
+    
+for basename in arr_add:
+    b0 = arm0.edit_bones.get(basename)
+    if b0 is not None:
+        create_Bone(b0)
+    
+bpy.ops.object.mode_set(mode='OBJECT')
+

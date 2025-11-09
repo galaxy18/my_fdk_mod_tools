@@ -1,0 +1,263 @@
+<html>
+	<head>
+		<script src="https://code.jquery.com/jquery-3.7.1.min.js"
+			integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+			crossorigin="anonymous"></script>
+		<title>kurodlc.json生成工具v1.0</title>
+	</head>
+	<body>
+	<script>
+var dlc_id=150;
+var item_id=15000;
+
+var template={
+    "CostumeTable": [
+        {
+            "character_id": 1,
+            "item_id": 60000,
+            "base_model": "c0000",
+            "costume_model": ""
+        }
+    ],
+    "DLCTable": [
+        {
+            "id": 600,
+            "sort_id": 1,
+            "items": [
+                60000
+            ],
+            "unk0": 0,
+            "quantity": [
+                1
+            ],
+            "unk1": 0,
+            "name": "dlc_name",
+            "type_desc": "dlc_type_desc",
+            "desc": "dlc_description"
+        }
+    ],
+    "ItemTableData": [
+        {
+            "id": 60000,
+            "icon": 370,
+            "name": "item_name",
+            "short_desc": "item_short_desc",
+            "desc": "item_long_desc",
+            "unk0": 0,
+            "type": 12,
+            "unk1": 0,
+            "unk2": 1,
+            "unused0": 0,
+            "unused1": 0,
+            "unused2": 0,
+            "unk3": 4,
+            "unk4": 43,
+            "unk5": 0,
+            "unk6": 0,
+            "unk7": 103,
+            "unk8": 1,
+            "unk9": 0,
+            "unused3": 0,
+            "unused4": 0,
+            "unused5": 0,
+            "obtain_type": "",
+            "obtain_amount": 0.0,
+            "unk10": 50606,
+            "hp": 0,
+            "str": 0,
+            "break": 0,
+            "def": 0,
+            "vit": 0,
+            "luck": 0,
+            "crit": 0,
+            "eva": 0,
+            "dmg": 0,
+            "dmg_received": 0,
+            "eff1_id": 0,
+            "eff1_0": 0.0,
+            "eff2_id": 0,
+            "eff2_0": 0.0,
+            "eff3_id": 0,
+            "eff3_0": 0.0,
+            "eff4_id": 0,
+            "eff4_0": 0.0,
+            "unk_txt": "",
+            "unk11": 0,
+            "unk12": 0
+        }
+    ]
+};
+
+var storageObj={};
+var characters=[[1,12],[2,13]];
+function loadstorage(){
+	storageObj=$.extend(true,{},template);
+	processfile();
+}
+function processfile(){
+	var CostumeTable = storageObj.CostumeTable[0];
+	$('input[name=cos_costume_model]').val(CostumeTable.costume_model);
+	$('input[name=cos_base_model]').val(CostumeTable.base_model);
+
+	var DLCTable = storageObj.DLCTable[0];
+	$('input[name=dlc_id]').val(dlc_id);
+	$('input[name=dlc_name]').val(DLCTable.name);
+	$('input[name=dlc_type_desc]').val(DLCTable.type_desc);
+	$('input[name=dlc_desc]').val(DLCTable.desc);
+	
+	var ItemTableData = storageObj.ItemTableData[0];
+	$('input[name=item_id]').val(item_id);
+	$('input[name=item_name]').val(ItemTableData.name);
+	$('input[name=item_short_desc]').val(ItemTableData.short_desc);
+	$('input[name=item_desc]').val(ItemTableData.desc);
+	$('input[name=item_type]').val(ItemTableData.type);
+}
+function builddata(){
+	var unindexed_array=$("form").serializeArray();
+	var indexed_array = {};
+    $.map(unindexed_array, function(n, i){
+		if(indexed_array[n['name']]==null){
+			indexed_array[n['name']] = n['value'];
+		}else if($.isArray(indexed_array[n['name']])){
+			indexed_array[n['name']].push(n['value']);
+		}else{
+			indexed_array[n['name']]=[indexed_array[n['name']]];
+			indexed_array[n['name']].push(n['value']);
+		}
+    });
+	var newvalue=indexed_array;
+	if($.isArray(newvalue.item_id)){
+		var DLCTable=$.extend(true,{},storageObj.DLCTable[0],{
+			"id":Number(newvalue.dlc_id),
+			"name":newvalue.dlc_name,
+			"type_desc":newvalue.dlc_type_desc,
+			"desc":newvalue.dlc_desc,
+			"items":newvalue.item_id.map(function(e){
+				return Number(e);
+			}),
+			"quantity":newvalue.item_id.map(function(e){
+				return 1;
+			})
+		});
+		var CostumeTables=[];
+		var ItemTableDatas=[];
+		for(var i=0;i<newvalue.item_id.length;i++){
+			CostumeTables.push({
+				"base_model":newvalue.cos_base_model[i],
+				"character_id":characters.filter(function(e){
+					return e[1]==newvalue.item_type[i];
+				})[0][0],
+				"costume_model":newvalue.cos_costume_model[i].trim().replaceAll('.mdl',''),
+				"item_id":Number(newvalue.item_id[i])
+			});
+			ItemTableDatas.push($.extend(true,{},storageObj.ItemTableData[0],{
+				"id":Number(newvalue.item_id[i]),
+				"name":newvalue.item_name[i],
+				"short_desc":newvalue.item_short_desc[i],
+				"desc":newvalue.item_desc[i],
+				"type":Number(newvalue.item_type[i])
+			}));
+		};
+		storageObj={
+			'DLCTable':[DLCTable],
+			'CostumeTable':CostumeTables,
+			'ItemTableData':ItemTableDatas
+		};
+	}else{
+		storageObj.DLCTable[0]=$.extend(true,{},storageObj.DLCTable[0],{
+			"id":Number(newvalue.dlc_id),
+			"name":newvalue.dlc_name,
+			"type_desc":newvalue.dlc_type_desc,
+			"desc":newvalue.dlc_desc,
+			"items":[Number(newvalue.item_id)]
+		});
+		storageObj.CostumeTable[0]={
+			"base_model":newvalue.cos_base_model,
+			"character_id":characters.filter(function(e){
+				return e[1]==newvalue.item_type;
+			})[0][0],
+			"costume_model":newvalue.cos_costume_model.trim().replaceAll('.mdl',''),
+			"item_id":Number(newvalue.item_id)
+		};
+		storageObj.ItemTableData[0]=$.extend(true,{},storageObj.ItemTableData[0],{
+			"id":Number(newvalue.item_id),
+			"name":newvalue.item_name,
+			"short_desc":newvalue.item_short_desc,
+			"desc":newvalue.item_desc,
+			"type":Number(newvalue.item_type)
+		});
+	}
+}
+function downloadfile(){
+	builddata();
+	var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(storageObj,null,'\t'));
+	var dlAnchorElem = document.getElementById('downloadAnchorElem');
+	dlAnchorElem.setAttribute("href",dataStr);
+	dlAnchorElem.setAttribute("download", '['+storageObj.DLCTable[0].id+']'+storageObj.DLCTable[0].name+".kurodlc.json");
+	dlAnchorElem.click();
+}
+function additem(){
+	$('#items').append($('#items fieldset:eq(0)').clone());
+}
+$('html').on('focus','input',function(e){
+	e.target.select();
+});
+	</script>
+<div style="display:flex;flex-direction:column;height:100%;width:100%;">
+	<div style="flex:1 1 auto;height:100%;overflow:hidden;">
+	<form id="inputform" style="height:100%;overflow:auto;display:flex;flex-direction:column;overflow:hidden;">
+		<fieldset style="height:150px;background-image:url('data/2024-11-20 213620.png');background-size:contain;background-position:top right;background-repeat:no-repeat;flex:0 0 auto;"><legend>DLC信息</legend>
+			<div style="display:flex"><div>ID</div><div><input type="number" name="dlc_id"></div></div>
+			<div style="display:flex"><div>名称</div><div><input type="text" name="dlc_name"></div></div>
+			<div style="display:flex"><div>type描述</div><div><input type="text" name="dlc_type_desc"></div></div>
+			<div style="display:flex"><div>描述</div><div><input type="text" name="dlc_desc"></div></div>
+		</fieldset>
+		<div id="items" style="flex:1 1 auto;overflow:auto;">
+			<fieldset style="margin:10px 0;background-image:url('data/2024-11-20 215041.png');
+			background-size:contain;background-position:center right;background-repeat:no-repeat;"><legend>Item</legend>
+				<fieldset><legend>Costume</legend>
+					<div style="display:flex"><div>模型文件名</div><div><input type="text" name="cos_costume_model"></div></div>
+					<div style="display:flex"><div>人物</div><div>
+						<select type="text" name="cos_base_model">
+							<option value="c0000">亚特鲁</option>
+							<option value="c0010">卡嘉</option>
+						</select>
+					</div></div>
+				</fieldset>
+				<fieldset style="flex:1 1 auto;"><legend>道具信息</legend>
+					<div style="display:flex"><div>ID</div><div><input type="number" name="item_id"></div></div>
+					<div style="display:flex"><div>名称</div><div><input type="text" name="item_name"></div></div>
+					<div style="display:flex"><div>short描述</div><div><input type="text" name="item_short_desc"></div></div>
+					<div style="display:flex"><div>描述</div><div><input type="text" name="item_desc"></div></div>
+					<div style="display:flex"><div>类型</div><div>
+						<select type="text" name="item_type">
+							<option value="12">亚特鲁服装</option>
+							<option value="13">卡嘉服装</option>
+						</select>
+					</div></div>
+				</fieldset>
+			</fieldset>
+		</div>
+	</form>
+	</div>
+	<div style="flex:0 0 auto;margin:0.5em;text-align:center;">
+		<button onclick="additem()">添加道具</button>
+		<button onclick="downloadfile()">下载JSON</button>
+		<a id="downloadAnchorElem" style="display:none"></a>
+	</div>
+</div>
+<script>
+loadstorage();
+</script>
+<style>
+fieldset>div{
+	padding:5px;
+	display:flex;
+	align-items:center;
+}
+fieldset>div>div:nth-child(1){
+	padding-right:1em;
+}
+</style>
+	</body>
+</html>

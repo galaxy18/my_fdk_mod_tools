@@ -1,0 +1,321 @@
+<html>
+	<head>
+		<script
+			src="https://code.jquery.com/jquery-3.7.1.min.js"
+			integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+			crossorigin="anonymous"></script>
+	</head>
+	<body>
+	<script>
+var black='#DBDBDB';
+var targetfile=null;
+var reffile=null;
+var targetname='';
+/*function selectfile(input){
+	if (input.files&&input.files[0]){
+		var file = input.files[0];
+		processfile(file);
+	}
+	input.value='';
+}*/
+function loadstorage(){
+}
+function clearstorage(){
+}
+function loadsettings(){
+}
+function savefile(){
+	/*var storageObj=settings.filter(function(e){
+		return e.removed!==true;
+	}).map(function(e,i){
+		e['id_referenceonly']=i;
+		return e;
+	});
+	localStorage.setItem("settings", JSON.stringify(storageObj));*/
+}
+function printfile(){
+	/*var storageObj=settings.filter(function(e){
+		return e.removed!==true;
+	}).map(function(e,i){
+		e['id_referenceonly']=i;
+		return e;
+	});
+	$('#result').val(JSON.stringify(storageObj,null,'\t'));
+	return storageObj;*/
+}
+function downloadfile(){
+	//console.log(targetfile);
+	if(targetname==''){return;}
+	var DynamicBone = targetfile.DynamicBone.filter(function(e){return e.removed!=true;}).concat(reffile?reffile.DynamicBone.filter(function(e){return e.added==true;}):[]);
+	var DynamicBoneCollider=targetfile.DynamicBoneCollider.filter(function(e){return e.removed!=true;}).concat(reffile?reffile.DynamicBoneCollider.filter(function(e){return e.added==true;}):[]);
+	var storageObj=$.extend(true,{},targetfile);
+	storageObj.DynamicBone=DynamicBone;
+	storageObj.DynamicBoneCollider=DynamicBoneCollider;
+	var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(storageObj,null,'\t'));
+	var dlAnchorElem = document.getElementById('downloadAnchorElem');
+	dlAnchorElem.setAttribute("href",dataStr);
+	dlAnchorElem.setAttribute("download", targetname);
+	dlAnchorElem.click();
+}
+
+var DynamicBonePanel=null;
+var DynamicBoneColliderPanel=null;
+
+function setvalue(file){
+	var filename=file.name;
+	targetname=filename;
+	$('#targetdoc').empty();
+	$('#refdoc').empty();
+	$('#filtertarget').val('');
+	$('#filterref').val('');
+	DynamicBonePanel=$('<div>').append($('<div>',{'style':'margin:0.5em;font-size:1.4em;'}).append('DynamicBone'));
+	DynamicBoneColliderPanel=$('<div>').append($('<div>',{'style':'margin:0.5em;font-size:1.4em;'}).append('DynamicBoneCollider'));
+	$('#targetdoc').append($('<div>').append(targetname))
+		.append($('<div>',{'style':'overflow:auto;'}).append(DynamicBonePanel).append(DynamicBoneColliderPanel));
+	Object.keys(targetfile).forEach(key=>{
+		if(key=="DynamicBone"){
+			var dom=$('<div>',{'style':'flex:1 1 50%;overflow:auto;display:flex;flex-wrap:wrap;'});
+			$(DynamicBonePanel).append(dom);
+			Object.keys(targetfile[key]).forEach(index=>{
+				var nodedom=$('<div>',{'class':'targetnode','style':'flex-wrap:wrap;border:1px solid blue;box-sizing:border-box;margin:0.2em;padding:0.2em;'});
+				nodedom.on('click',function(){
+					nodedom.toggleClass('removed');
+					targetfile[key][index]['removed']=nodedom.hasClass('removed')
+				});
+				targetfile['DynamicBone'][index]['Joint'].forEach(Joint=>{
+					nodedom.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'}).append(Joint.node));
+				});
+				nodedom.data('keys',targetfile['DynamicBone'][index]['Joint'].map(function(e){return e.node}));
+				$(dom).append(nodedom);
+			});
+		}else if(key=="DynamicBoneCollider"){
+			var dom=$('<div>',{'style':'flex:1 1 50%;overflow:auto;display:flex;flex-wrap:wrap;'});
+			$(DynamicBoneColliderPanel).append(dom);
+			Object.keys(targetfile[key]).forEach(index=>{
+				var nodedom=$('<div>',{'class':'targetnode','style':'flex-wrap:wrap;border:1px solid blue;box-sizing:border-box;margin:0.2em;padding:0.2em;'});
+				nodedom.on('click',function(){
+					nodedom.toggleClass('removed');
+					targetfile[key][index]['removed']=nodedom.hasClass('removed')
+				});
+				if(targetfile['DynamicBoneCollider'][index]['Joint']){
+					targetfile['DynamicBoneCollider'][index]['Joint'].forEach(Joint=>{
+						nodedom.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'}).append(Joint.node));
+					});
+				}else{
+					nodedom.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'}).append(targetfile['DynamicBoneCollider'][index].node+'/'+targetfile['DynamicBoneCollider'][index].name));
+				}
+				nodedom.data('keys',[targetfile['DynamicBoneCollider'][index].name]);
+				$(dom).append(nodedom);
+			});
+		}
+	});
+}
+function setrefvalue(file){
+	var filename=file.name;
+	Object.keys(reffile).forEach(key=>{
+		if(key=="DynamicBone"){
+			var dom=$('<div>',{'style':'flex:1 1 50%;overflow:auto;-display:flex;flex-wrap:wrap;'});
+			var dom2=$('<div>',{'style':'flex:1 1 50%;overflow:auto;-display:flex;flex-wrap:wrap;'});
+			$('#refdoc').append($('<div>',{'style':'margin:0.5em;font-size:1.4em;'}).append('DynamicBone'));
+			$('#refdoc').append(dom);
+			$(DynamicBonePanel).append(dom2);
+			Object.keys(reffile[key]).forEach(index=>{
+				var nodedom=$('<div>',{'class':'refnode','style':'flex-wrap:wrap;border:1px solid red;box-sizing:border-box;margin:0.2em;padding:0.2em;'});
+				var nodedom2=$('<div>',{'class':'refnode','style':'flex-wrap:wrap;border:1px solid red;box-sizing:border-box;margin:0.2em;padding:0.2em;'});
+				nodedom.on('click',function(){
+					nodedom.toggleClass('added');
+					nodedom2.toggleClass('added');
+					reffile[key][index]['added']=nodedom.hasClass('added');
+				});
+				nodedom2.on('click',function(){
+					nodedom.toggleClass('added');
+					nodedom2.toggleClass('added');
+					reffile[key][index]['added']=nodedom.hasClass('added');
+				});
+				reffile['DynamicBone'][index]['Joint'].forEach(Joint=>{
+					nodedom.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'}).append(Joint.node));
+					nodedom2.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'}).append(Joint.node));
+				});
+				nodedom.data('keys',reffile['DynamicBone'][index]['Joint'].map(function(e){return e.node}));
+				$(dom).append(nodedom);
+				$(dom2).append(nodedom2);
+			});
+		}else if(key=="DynamicBoneCollider"){
+			var dom=$('<div>',{'style':'flex:1 1 50%;overflow:auto;-display:flex;flex-wrap:wrap;'});
+			var dom2=$('<div>',{'style':'flex:1 1 50%;overflow:auto;-display:flex;flex-wrap:wrap;'});
+			$('#refdoc').append($('<div>',{'style':'margin:0.5em;font-size:1.4em;'}).append('DynamicBoneCollider'));
+			$('#refdoc').append(dom);
+			$(DynamicBoneColliderPanel).append(dom2);
+			Object.keys(reffile[key]).forEach(index=>{
+				var nodedom=$('<div>',{'class':'refnode','style':'flex-wrap:wrap;border:1px solid red;box-sizing:border-box;margin:0.2em;padding:0.2em;'});
+				var nodedom2=$('<div>',{'class':'refnode','style':'flex-wrap:wrap;border:1px solid red;box-sizing:border-box;margin:0.2em;padding:0.2em;'});
+				nodedom.on('click',function(){
+					nodedom.toggleClass('added');
+					nodedom2.toggleClass('added');
+					reffile[key][index]['added']=nodedom.hasClass('added');
+				});
+				nodedom2.on('click',function(){
+					nodedom.toggleClass('added');
+					nodedom2.toggleClass('added');
+					reffile[key][index]['added']=nodedom.hasClass('added');
+				});
+				if(reffile['DynamicBoneCollider']&&reffile['DynamicBoneCollider'][index]){
+					if(reffile['DynamicBoneCollider'][index]['Joint']){
+						reffile['DynamicBoneCollider'][index]['Joint'].forEach(Joint=>{
+							nodedom.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'}).append(Joint.node));
+							nodedom2.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'}).append(Joint.node));
+						});
+					}else{
+						nodedom.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'}).append(reffile['DynamicBoneCollider'][index].node+'/'+reffile['DynamicBoneCollider'][index].name));
+						nodedom2.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'}).append(reffile['DynamicBoneCollider'][index].node+'/'+reffile['DynamicBoneCollider'][index].name));
+					}
+				}else{
+					console.log(reffile['DynamicBoneCollider'][index]);
+				}
+				nodedom.data('keys',[reffile['DynamicBoneCollider'][index].name]);
+				$(dom).append(nodedom);
+				$(dom2).append(nodedom2);
+			});
+		}
+	});
+}
+function processimage(file){
+}
+function processtargetfile(file){
+	var reader = new FileReader();
+	reader.onload = function (e) {
+		var filecontent=JSON.parse(e.target.result);
+		targetfile=filecontent;
+		setvalue(file, filecontent);
+	}
+	reader.readAsText(file);
+}
+function processreffile(file){
+	var reader = new FileReader();
+	reader.onload = function (e) {
+		var filecontent=JSON.parse(e.target.result);
+		reffile=filecontent;
+		setrefvalue(file);
+	}
+	reader.readAsText(file);
+}
+	</script>
+<div style="display:flex;flex-direction:column;height:100%;width:100%;">
+	<div style="display:flex;flex:1 1 auto;overflow:hidden;">
+		<div style="flex:1 1 40%;border:1px solid darkblue;margin-right:0.2em;display:flex;flex-direction:column;">
+			<div style="flex:1 1 auto;display:flex;flex-direction:column;overflow: auto;" id="targetdoc"></div>
+			<div style="display:flex;justify-content:flex-end;margin:0.2em;">过滤：<input type="text" id="filtertarget" /></div>
+		</div>
+		<div style="flex: 1 1 40%;box-sizing:border-box;border:1px solid darkred;margin-left:0.2em;display:flex;flex-direction:column;">
+			<div style="flex:1 1 auto;display:flex;flex-direction:column;overflow:hidden;" id="refdoc"></div>
+			<div style="display:flex;justify-content:flex-end;margin:0.2em;">过滤：<input type="text" id="filterref" /></div>
+		</div>
+	</div>
+	<div style="flex:0 0 auto;margin:0.5em;text-align:center;">
+		<button onclick="downloadfile()">Generate</button>
+		<a id="downloadAnchorElem" style="display:none"></a>
+	</div>
+</div>
+<script>
+$('#output').hide();
+$('#shaderref').hide();
+$("html").on("dragover", function(event) {
+    event.preventDefault();  
+    event.stopPropagation();
+});
+
+$("html").on("dragleave", function(event) {
+    event.preventDefault();  
+    event.stopPropagation();
+});
+$("html").on("drop", function(e) {
+    e.preventDefault();  
+    e.stopPropagation();
+});
+$('#targetdoc').on("drop", function(e) {
+    e.preventDefault();  
+    e.stopPropagation();
+	if(e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files.length) {
+		var files = e.originalEvent.dataTransfer.files;
+		if(files && files[0]){
+			processtargetfile(files[0]);
+		}
+	}
+});
+$('#refdoc').on("drop", function(e) {
+    e.preventDefault();  
+    e.stopPropagation();
+	if(e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files.length) {
+		var files = e.originalEvent.dataTransfer.files;
+		if(files && files[0]){
+			processreffile(files[0]);
+		}
+	}
+});
+$('#filtertarget').on('keyup',function(){
+	var keyword = $('#filtertarget').val().toLowerCase();
+	if(keyword==''){
+		$('.targetnode.not_containskeyword').removeClass('not_containskeyword');
+	}else{
+		$('.targetnode').each(function(i,e){
+			var _dom = $(e);
+			var keys = _dom.data('keys');
+			if(keys==null){
+				
+			}else{
+				var contains=false;
+				_dom.toggleClass('not_containskeyword',
+					!keys.filter(function(key){return key.toLowerCase().indexOf(keyword)>=0;}).length>0);
+			}
+		});
+	}
+});
+$('#filterref').on('keyup',function(){
+	var keyword = $('#filterref').val().toLowerCase();
+	if(keyword==''){
+		$('.refnode.not_containskeyword').removeClass('not_containskeyword');
+	}else{
+		$('.refnode').each(function(i,e){
+			var _dom = $(e);
+			var keys = _dom.data('keys');
+			if(keys==null){
+				
+			}else{
+				var contains=false;
+				_dom.toggleClass('not_containskeyword',
+					!keys.filter(function(key){return key.toLowerCase().indexOf(keyword)>=0;}).length>0);
+			}
+		});
+	}
+});
+loadstorage();
+</script>
+<style>
+.targetnode{
+	display:flex;
+}
+.targetnode.not_containskeyword{
+	display:none !important;
+}
+.targetnode.removed{
+	opacity:0.5;
+	order:99;
+}
+.refnode.not_containskeyword{
+	display:none !important;
+}
+#targetdoc .refnode.added{
+	display:flex;
+}
+#targetdoc .refnode{
+	display:none;
+}
+#refdoc .refnode.added{
+	display:none;
+}
+#refdoc .refnode{
+	display:flex;
+}
+</style>
+	</body>
+</html>

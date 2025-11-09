@@ -1,0 +1,1 @@
+combine_gltf_with_origin_and_mdl.bat %~n0

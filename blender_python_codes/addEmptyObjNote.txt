@@ -1,0 +1,37 @@
+#用来添加缺失的空物体
+
+import math,numpy
+arr_addPoint = numpy.array([["Megane_Point","Up_Point","BONE","Head"]
+,["LeftWeaponRot_Point","Up_Point","BONE","Hips"]
+,["LeftWeapon_Point","LeftWeaponRot_Point","OBJECT",""]
+,["RightWeaponRot_Point","Up_Point","BONE","Hips"]
+,["RightWeapon_Point","RightWeaponRot_Point","OBJECT",""]
+])
+arm = bpy.context.selected_objects[0].data
+for obj in arr_addPoint:
+    if not obj[0] in bpy.data.objects:
+        bpy.ops.object.mode_set(mode="OBJECT")
+        bpy.ops.object.select_all(action="DESELECT")
+        bpy.ops.object.empty_add(type="PLAIN_AXES", align="WORLD", location=(0, 0, 0), scale=(1, 1, 1))
+        #ae = bpy.context.active_object
+        bpy.context.active_object.name = obj[0]
+        if obj[1] in bpy.data.objects:
+            bpy.context.active_object.parent = bpy.data.objects[obj[1]]
+            bpy.context.active_object.parent_type = obj[2]
+            if obj[2] == "BONE":
+                if obj[3] in arm.bones :
+                    bpy.context.active_object.parent_bone = obj[3]
+                    bpy.context.active_object.location = arm.bones[obj[3]].tail
+                else:
+                    print ("Error:"+obj[0]+": parent bone "+obj[3]+" not exist")
+        else:
+            print("Error:"+obj[0]+": parent node "+obj[1]+" not exist")
+        #math.sin(math.pi/4)
+        bpy.context.active_object.rotation_mode = "QUATERNION"
+        #bpy.context.active_object.rotation_quaternion = Quaternion([math.sin(math.pi/4),-math.sin(math.pi/4),0,0])
+        bpy.context.active_object.rotation_quaternion = Quaternion([1,0,0,0])
+        bpy.context.active_object.scale = [1.0,1.0,1.0]
+        bpy.context.object.lock_scale = [True,True,True]
+    else:
+        print("Info:"+obj[0]+": "+obj[0]+" already exists")
+        

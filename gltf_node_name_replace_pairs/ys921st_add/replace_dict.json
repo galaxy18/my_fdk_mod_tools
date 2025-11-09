@@ -1,0 +1,23 @@
+{
+	"Bone_swallow_in_root": "BS01",
+	"Bone_Lswallow_in1": "BS01_2",
+	"Bone_Lswallow_in2": "BS02",
+	"Bone_Lswallow_in3": "BS03",
+	"Bone_Lswallow_in4": "BS04",
+	"Bone_Rswallow_in1":"BS01_2_2",
+	"Bone_Rswallow_in2":"BS02_2",
+	"Bone_Rswallow_in3":"BS03_2",
+	"Bone_Rswallow_in4":"BS04_2",
+	"Bone_Rswallow_out1":"RightSC01",
+	"Bone_Rswallow_out2":"RightSC01_2",
+	"Bone_Rswallow_out3":"RightSC02",
+	"Bone_Rswallow_out4":"RightSC03",
+	"Bone_Rswallow_out5":"RightSC04",
+	"Bone_Rswallow_metal":"RightSC05",
+	"Bone_Lswallow_out1":"LeftSC01",
+	"Bone_Lswallow_out2":"LeftSC01_2",
+	"Bone_Lswallow_out3":"LeftSC02",
+	"Bone_Lswallow_out4":"LeftSC03",
+	"Bone_Lswallow_out5":"LeftSC04",
+	"Bone_Lswallow_metal":"LeftSC05"
+}

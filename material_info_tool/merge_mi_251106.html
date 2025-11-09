@@ -1,0 +1,570 @@
+<html>
+	<head>
+		<script
+			src="https://code.jquery.com/jquery-3.7.1.min.js"
+			integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+			crossorigin="anonymous"></script>
+	</head>
+	<body>
+	<script>
+var black='#DBDBDB';
+var targetfile=null;
+var reffile=null;
+var targetname='';
+function loadstorage(){}
+function clearstorage(){}
+function loadsettings(){}
+function savefile(){}
+function printfile(){}
+function processimage(file){}
+function downloadfile(){
+	if(targetname==''){return;}
+	var storageObj=$.extend(true,{},targetfile);
+    Object.keys(panels).forEach(key=>{
+        var values=targetfile[key].filter(function(e){return e.removed!=true;})
+            //.concat(reffile?reffile[key].filter(function(e){return e.added==true;}):[]);
+        storageObj[key]=values;
+    });
+	var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(storageObj,null,'\t'));
+	var dlAnchorElem = document.getElementById('downloadAnchorElem');
+	dlAnchorElem.setAttribute("href",dataStr);
+	dlAnchorElem.setAttribute("download", targetname);
+	dlAnchorElem.click();
+}
+function getType(key){
+    //0=fixed
+    //1=0 or 1
+    //2=0-1f
+    //3=number
+    //4=deg
+    //5=bool
+    switch(key){
+        case 'stretch_limit':
+        case 'freeze_axis':
+        case 'stretch_resilience':return 1;break;//0 or 1
+        case 'resilience':return 3;break;//number
+        case 'rotation_limit':return 4;break;//deg
+        case 'is_disable':
+        case 'is_enable_stretch':
+        case 'is_dynamic_damping':return 5;break;//bool
+        case 'damping_min':
+        case 'damping_max':
+        case 'driven_infl':return 0;break;//fixed
+        case 'damping':
+        case 'collision_radius':
+        case 'damping_velocity_ratio':
+        case 'wind_influence':
+        case 'gravity':return 2;break;//0-1f
+        default: return 0;
+    }
+}
+function getKeyName(key){
+    var type=getType(key);
+    var name='';
+    switch(key){
+        case 'stretch_resilience':name='拉伸弹性';break;
+        case 'resilience':name='弹性';break;
+        case 'rotation_limit':name='旋转限制';break;
+        case 'driven_infl':name='driven_infl(1)';break;
+        case 'stretch_limit':name='弹性限制';break;
+        case 'freeze_axis':name='冻结轴';break;
+        case 'damping_min':name='阻尼min(0.1)';break;
+        case 'is_enable_stretch':name='应用弹性';break;
+        case 'gravity':name='重力';break;
+        case 'is_dynamic_damping':name='动态阻尼';break;
+        case 'damping':name='阻尼';break;
+        case 'damping_max':name='阻尼max(0.1/0.25)';break;
+        case 'collision_radius':name='碰撞半径';break;
+        case 'damping_velocity_ratio':name='阻尼速度比';break;
+        case 'wind_influence':name='风影响';break;
+        default: name=key;break;
+    }
+    switch(type){
+        case 1:name+='(0/1)';break;
+        case 2:name+='(0-1)';break;
+        case 3:name+='(數)';break;
+        case 4:name+='(°)';break;
+        default:
+        case 0:break;
+    }
+    return name;
+}
+var DynamicBoneColliderMapping={};
+function createCollection(dom,key,index){
+    var nodedom=$('<div>',
+    {'class':'targetnode','style':'flex-wrap:wrap;border:1px solid blue;box-sizing:border-box;margin:0.2em;padding:0.2em;'});
+    nodedom.on('click',function(e){
+        e.stopPropagation();
+        nodedom.toggleClass('removed');
+        targetfile[key][index]['removed']=nodedom.hasClass('removed');
+    });
+    var panel = $('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'})
+        .on('click',function(e){
+            e.stopPropagation();
+        }).hide()
+        .append($('<div>',{'style':'display:flex;margin:5px;'})
+            .append($('<div>',{'class':'actionbtn'}).append('+').on('click',function(e){
+                e.stopPropagation();
+                if(nodedom.hasClass('removed')){return;}
+                targetfile[key].push(JSON.parse(JSON.stringify(targetfile[key][index])));
+                targetfile[key][targetfile[key].length-1]['removed']=false;
+                createCollection(dom,key,targetfile[key].length-1);
+            }))
+            .append($('<div>',{'class':'actionbtn'}).append('-').on('click',function(e){
+                e.stopPropagation();
+                nodedom.toggleClass('removed');
+                targetfile[key][index]['removed']=nodedom.hasClass('removed')
+            }))
+        );
+    var title=$('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'})
+        .on('contextmenu',function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            panel.toggle();
+        }).append(key=='DynamicBone'||key=='LookIK'?index:(key=='TwoBoneIK'?targetfile[key][index].root:targetfile[key][index].name))
+        .append(panel);
+    nodedom.append(title);
+    if(key=='DynamicBoneCollider'){
+        targetfile[key].map(function(e,i){DynamicBoneColliderMapping[e.name]=i;return e;});
+    }
+    Object.keys(targetfile[key][index]).forEach(key2=>{
+        switch(key2){
+            case 'added':
+            case 'Joint':break;
+            case 'SpecificCollider':
+            case 'target_materials':
+            case 'NeighborBones':{
+                var inputtext = $('<input>',{'type':'text','value':targetfile[key][index][key2]});
+                inputtext.on('focusout',function(){
+                    targetfile[key][index][key2]=inputtext.val().split(',').filter(function(e){return e!='';});
+                    console.log('input a');
+                }).on('contextmenu',function(e){
+                    e.stopPropagation();
+                });
+                panel.append($('<div>',{'style':'display:flex;justify-content:space-between;'})
+                .append(getKeyName(key2)+"(split by ,)").append(inputtext));
+                break;
+            }
+            default:{
+                var inputtext = $('<input>',{'type':'text','value':targetfile[key][index][key2]});
+                inputtext.on('focusout',function(){
+                    if(inputtext.val()=='true'||inputtext.val()=='false'||key2=='node'||key2=='name'){
+                        targetfile[key][index][key2]=inputtext.val()=='true';
+                        console.log('input b');
+                    }else{
+                        targetfile[key][index][key2]=Number(inputtext.val());
+                    }
+                }).on('contextmenu',function(e){
+                    e.stopPropagation();
+                });
+                panel.append($('<div>',{'style':'display:flex;justify-content:space-between;'})
+                .append(getKeyName(key2)).append(inputtext));
+                break;
+            }
+        }
+    });
+    if(targetfile[key][index]['Joint']){
+        targetfile[key][index]['Joint'].forEach(function(Joint,index2){
+            var panel2 = $('<div>',{'class':'JointPanel'})
+                .on('click',function(e){
+                    e.stopPropagation();
+                }).hide();
+            var title2=$('<div>',{'class':'JointContainer'})
+                .on('contextmenu',function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    panel2.toggle();
+                }).append(Joint.node).append(panel2);
+            nodedom.append(title2);
+            Object.keys(Joint).forEach(key2=>{
+                var inputtext = $('<input>',{'type':'text','value':Joint[key2]});
+                inputtext.on('focusout',function(){
+                    if(inputtext.val()=='true'||inputtext.val()=='false'||key2=='node'||key2=='name'){
+                        targetfile['DynamicBone'][index]['Joint'][index2][key2]=inputtext.val()=='true';
+                        console.log('input c');
+                    }else{
+                        targetfile['DynamicBone'][index]['Joint'][index2][key2]=Number(inputtext.val());
+                    }
+                }).on('contextmenu',function(e){
+                    e.stopPropagation();
+                });
+                var controllers = $('<div>');
+                panel2.append($('<div>',{'class':'inputpanel'})
+                    .append($('<div>').append(getKeyName(key2)).append(controllers))
+                    .append($('<div>').append(inputtext)));
+                if(key2=='node'||key2=='name'){//
+                }else{
+                    var type = getType(key2);
+                    switch(type){
+                        case 1:{
+                            [0,1].forEach(function(option){
+                                var btn=$('<div>',{'class':'actionbtn'}).append(option).on('click',function(){
+                                    inputtext.val(option);
+                                    targetfile['DynamicBone'][index]['Joint'][index2][key2]=option;
+                                });
+                                controllers.append(btn);
+                            });break;
+                        }
+                        case 2:{
+                            var div1 = $('<div>',{'style':'display:flex;justify-content:space-between;'});
+                            var div2 = $('<div>',{'style':'display:flex;justify-content:space-between;'});
+                            [0.5,0.1,0.01,0.001].forEach(function(option){
+                                var btn=$('<div>',{'class':'actionbtn'}).append('+'+option).on('click',function(){
+                                    inputtext.val(Number(inputtext.val())+option);
+                                    targetfile['DynamicBone'][index]['Joint'][index2][key2]=Number(inputtext.val());
+                                });
+                                div1.append(btn);
+                                var btn2=$('<div>',{'class':'actionbtn'}).append('-'+option).on('click',function(){
+                                    inputtext.val(Number(inputtext.val())-option);
+                                    targetfile['DynamicBone'][index]['Joint'][index2][key2]=Number(inputtext.val());
+                                });
+                                div2.append(btn2);
+                            });
+                            controllers.append(div2).append(div1);break;
+                        }
+                        case 3:{
+                            var div1 = $('<div>',{'style':'display:flex;justify-content:space-between;'});
+                            var div2 = $('<div>',{'style':'display:flex;justify-content:space-between;'});
+                            [10,5,1,0.5,0.1,0.01].forEach(function(option){
+                                var btn=$('<div>',{'class':'actionbtn'}).append('+'+option).on('click',function(){
+                                    inputtext.val(Number(inputtext.val())+option);
+                                    targetfile['DynamicBone'][index]['Joint'][index2][key2]=Number(inputtext.val());
+                                });
+                                div1.append(btn);
+                                var btn2=$('<div>',{'class':'actionbtn'}).append('-'+option).on('click',function(){
+                                    inputtext.val(Number(inputtext.val())-option);
+                                    targetfile['DynamicBone'][index]['Joint'][index2][key2]=Number(inputtext.val());
+                                });
+                                div2.append(btn2);
+                            });
+                            controllers.append(div2).append(div1);break;
+                        }
+                        case 4:{
+                            var div1 = $('<div>',{'style':'display:flex;justify-content:space-between;'});
+                            var div2 = $('<div>',{'style':'display:flex;justify-content:space-between;'});
+                            var div3 = $('<div>',{'style':'display:flex;justify-content:space-between;'});
+                            [90,30,15,10].forEach(function(option){
+                                var btn=$('<div>',{'class':'actionbtn'}).append('+'+option).on('click',function(){
+                                    inputtext.val(Number(inputtext.val())+option/(180/Math.PI));
+                                    if(Number(inputtext.val())<0){inputtext.val(0)};
+                                    targetfile['DynamicBone'][index]['Joint'][index2][key2]=Number(inputtext.val());
+                                });
+                                div1.append(btn);
+                                var btn2=$('<div>',{'class':'actionbtn'}).append('-'+option).on('click',function(){
+                                    inputtext.val(Number(inputtext.val())-option/(180/Math.PI));
+                                    if(Number(inputtext.val())<0){inputtext.val(0)};
+                                    targetfile['DynamicBone'][index]['Joint'][index2][key2]=Number(inputtext.val());
+                                });
+                                div2.append(btn2);
+                            });
+                            [0,30,60,90,180].forEach(function(option){
+                                var btn=$('<div>',{'class':'actionbtn'}).append(option).on('click',function(){
+                                    inputtext.val(option/(180/Math.PI));
+                                    targetfile['DynamicBone'][index]['Joint'][index2][key2]=option;
+                                });
+                                div3.append(btn);
+                            });
+                            controllers.append(div2).append(div1).append(div3);break;
+                        }
+                        case 5:{
+                            [0,1].forEach(function(option){
+                                var btn=$('<div>',{'class':'actionbtn'}).append(option==0?'false':'true').on('click',function(){
+                                    inputtext.val(option==0?'false':'true');
+                                    targetfile['DynamicBone'][index]['Joint'][index2][key2]=option==0?'false':'true';
+                                });
+                                controllers.append(btn);
+                            });break;
+                        }
+                        default:break;
+                    }
+                }
+            });
+        });
+        nodedom.data('keys',targetfile[key][index]['Joint'].map(function(e){return e.node}));
+    }
+    //TODO
+    $(dom).append(nodedom);
+}
+function createPanel(parent, key){
+    parent=$(parent);
+    var dom=$('<div>',{'style':'flex:1 1 50%;overflow:auto;display:flex;flex-wrap:wrap;align-items:flex-start;'});
+    parent.append(dom);
+    Object.keys(targetfile[key]).forEach(index=>{
+        createCollection(dom,key,index);
+    });
+}
+var panels={};
+function setvalue(file){
+	var filename=file.name;
+	targetname=filename;
+	$('#targetdoc').empty();
+	$('#refdoc').empty();
+	$('#filtertarget').val('');
+	$('#filterref').val('');
+    var panelscontainer=$('<div>',{'style':'overflow:auto;'});
+	$('#targetdoc').append($('<div>').append(targetname)).append(panelscontainer);
+	Object.keys(targetfile).forEach(key=>{
+        switch(key){
+            case 'Bounding':
+            case 'Occluder':
+            case 'LOD':
+            case 'LOD_ysx':
+            case 'Lights':break;
+            case 'Extra':break;
+            default:{
+                var panel=$('<div>').append($('<div>',{'style':'margin:0.5em;font-size:1.4em;'}).append(key));
+                createPanel(panel,key);
+                panels[key]=panel;
+                panelscontainer.append(panel);
+                break;
+            }
+        }
+	});
+}
+var DynamicBoneColliderDom2;
+function createrefpanel(key){
+    if(!panels.hasOwnProperty(key)){return;}
+    var dom=$('<div>',{'style':'display:flex;flex-wrap:wrap;'});
+    var dom2=$('<div>',{'style':'display:flex;flex-wrap:wrap;border:1px solid '+black+';box-sizing:border-box;'});
+    $('#refdoc').append($('<div>',{'style':'margin:0.5em;font-size:1.4em;'}).append(key));
+    $('#refdoc').append(dom);
+    panels[key].append(dom2);
+    if(key=='DynamicBoneCollider'){
+        DynamicBoneColliderDom2=dom2;
+    }
+    Object.keys(reffile[key]).forEach(index=>{
+        var nodedom=$('<div>',{'class':'refnode',
+            'style':'flex-wrap:wrap;border:1px solid red;box-sizing:border-box;margin:0.2em;padding:0.2em;'});
+        var nodedom2=$('<div>',{'class':'refnode',
+            'style':'flex-wrap:wrap;border:1px solid red;box-sizing:border-box;margin:0.2em;padding:0.2em;'});
+        nodedom.on('click',function(e){
+            //nodedom.toggleClass('added');
+            //nodedom2.toggleClass('added');
+            reffile[key][index]['added']=nodedom.hasClass('added');
+            if(reffile[key][index]['SpecificCollider']){
+                reffile[key][index]['SpecificCollider'].forEach(name=>{
+                    //TODO: attach Collider
+                    if(DynamicBoneColliderMapping.hasOwnProperty(name)){//
+                    }else{
+                        DynamicBoneColliderDef=reffile['DynamicBoneCollider'].filter(function(e){return e.name == name;});
+                        if(DynamicBoneColliderDef.length==0){alert("missing DynamicBoneCollider "+name+" in ref file");}
+                        else{
+                            targetfile['DynamicBoneCollider'].push(JSON.parse(JSON.stringify(DynamicBoneColliderDef[0])));
+                            DynamicBoneColliderMapping[name]=targetfile['DynamicBoneCollider'].length-1;
+                            createCollection(DynamicBoneColliderDom2,'DynamicBoneCollider',DynamicBoneColliderMapping[name]);
+                        }
+                    }
+                });
+            }
+            targetfile[key].push(JSON.parse(JSON.stringify(reffile[key][index])));
+            createCollection(dom2,key,targetfile[key].length-1);
+        });
+        nodedom2.on('click',function(e){
+            //nodedom.toggleClass('added');
+            //nodedom2.toggleClass('added');
+            //reffile[key][index]['added']=nodedom.hasClass('added');
+        });
+        if(reffile[key][index]['Joint']){
+            reffile[key][index]['Joint'].forEach(Joint=>{
+                nodedom.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'})
+                .append(Joint.node));
+                nodedom2.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'})
+                .append(Joint.node));
+            });
+            nodedom.data('keys',reffile[key][index]['Joint'].map(function(e){return e.node}));
+        }else{
+            nodedom.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'})
+            .append(key=='DynamicBone'||key=='LookIK'?index:(key=='TwoBoneIK'?reffile[key][index].root:reffile[key][index].name)));
+            nodedom2.append($('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'})
+            .append(key=='DynamicBone'||key=='LookIK'?index:(key=='TwoBoneIK'?reffile[key][index].root:reffile[key][index].name)));
+        }
+        $(dom).append(nodedom);
+        //$(dom2).append(nodedom2);
+    });
+}
+function setrefvalue(file){
+	var filename=file.name;
+	Object.keys(reffile).forEach(key=>{
+        createrefpanel(key);
+	});
+}
+function processtargetfile(file){
+	var reader = new FileReader();
+	reader.onload = function (e) {
+		var filecontent=JSON.parse(e.target.result);
+		targetfile=filecontent;
+		setvalue(file, filecontent);
+	}
+	reader.readAsText(file);
+}
+function processreffile(file){
+	var reader = new FileReader();
+	reader.onload = function (e) {
+		var filecontent=JSON.parse(e.target.result);
+		reffile=filecontent;
+		setrefvalue(file);
+	}
+	reader.readAsText(file);
+}
+	</script>
+<div style="display:flex;flex-direction:column;height:100%;width:100%;">
+	<div style="display:flex;flex:1 1 auto;overflow:hidden;">
+		<div style="flex:1 1 40%;border:1px solid darkblue;margin-right:0.2em;display:flex;flex-direction:column;">
+			<div style="flex:1 1 auto;display:flex;flex-direction:column;overflow: auto;" id="targetdoc"></div>
+			<!-- <div style="display:flex;justify-content:flex-end;margin:0.2em;">过滤：<input type="text" id="filtertarget" /></div> -->
+		</div>
+        <div style="display:flex;align-items:center;justify-content:center;">
+            <div class="actionbtn"
+            onclick="$('#rightpanel').toggle();$(this).html($('#rightpanel').is(':visible')?'>':'<');">></div>
+        </div>
+		<div id="rightpanel" style="flex: 1 1 40%;box-sizing:border-box;border:1px solid darkred;margin-left:0.2em;display:flex;flex-direction:column;">
+			<div style="flex:1 1 auto;display:flex;flex-direction:column;overflow:auto;" id="refdoc"></div>
+			<!-- <div style="display:flex;justify-content:flex-end;margin:0.2em;">过滤：<input type="text" id="filterref" /></div> -->
+		</div>
+	</div>
+	<div style="flex:0 0 auto;margin:0.5em;text-align:center;">
+		<button onclick="downloadfile()">Generate</button>
+		<a id="downloadAnchorElem" style="display:none"></a>
+	</div>
+</div>
+<script>
+$('#output').hide();
+$('#shaderref').hide();
+$("html").on("dragover", function(event) {
+    event.preventDefault();  
+    event.stopPropagation();
+});
+
+$("html").on("dragleave", function(event) {
+    event.preventDefault();  
+    event.stopPropagation();
+});
+$("html").on("drop", function(e) {
+    e.preventDefault();  
+    e.stopPropagation();
+});
+$('#targetdoc').on("drop", function(e) {
+    e.preventDefault();  
+    e.stopPropagation();
+	if(e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files.length) {
+		var files = e.originalEvent.dataTransfer.files;
+		if(files && files[0]){
+			processtargetfile(files[0]);
+		}
+	}
+});
+$('#refdoc').on("drop", function(e) {
+    e.preventDefault();  
+    e.stopPropagation();
+	if(e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files.length) {
+		var files = e.originalEvent.dataTransfer.files;
+		if(files && files[0]){
+			processreffile(files[0]);
+		}
+	}
+});
+$('#filtertarget').on('keyup',function(){
+	var keyword = $('#filtertarget').val().toLowerCase();
+	if(keyword==''){
+		$('.targetnode.not_containskeyword').removeClass('not_containskeyword');
+	}else{
+		$('.targetnode').each(function(i,e){
+			var _dom = $(e);
+			var keys = _dom.data('keys');
+			if(keys==null){
+				
+			}else{
+				var contains=false;
+				_dom.toggleClass('not_containskeyword',
+					!keys.filter(function(key){return key.toLowerCase().indexOf(keyword)>=0;}).length>0);
+			}
+		});
+	}
+});
+$('#filterref').on('keyup',function(){
+	var keyword = $('#filterref').val().toLowerCase();
+	if(keyword==''){
+		$('.refnode.not_containskeyword').removeClass('not_containskeyword');
+	}else{
+		$('.refnode').each(function(i,e){
+			var _dom = $(e);
+			var keys = _dom.data('keys');
+			if(keys==null){
+				
+			}else{
+				var contains=false;
+				_dom.toggleClass('not_containskeyword',
+					!keys.filter(function(key){return key.toLowerCase().indexOf(keyword)>=0;}).length>0);
+			}
+		});
+	}
+});
+loadstorage();
+</script>
+<style>
+.targetnode{
+	display:flex;
+}
+.targetnode.not_containskeyword{
+	display:none !important;
+}
+.targetnode.removed{
+	opacity:0.5;
+	order:99;
+}
+.refnode.not_containskeyword{
+	display:none !important;
+}
+#targetdoc .refnode.added{
+	display:flex;
+}
+#targetdoc .refnode{
+	display:none;
+}
+#refdoc .refnode.added{
+	display:none;
+}
+#refdoc .refnode{
+	display:flex;
+}
+.actionbtn{
+    min-width:1em;
+    height:1em;
+    border:1px solid lightpink;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+}
+.actionbtn:hover{
+    background:lightpink;
+}
+.JointContainer{
+    border:1px solid #a9a9a9;
+    box-sizing:border-box;
+    margin:0.2em;
+    padding:0.2em;
+}
+.JointPanel{
+    -border:1px solid black;
+    box-sizing:border-box;
+    -margin:0.2em;
+    -padding:0.2em;
+}
+.inputpanel{
+    display:flex;
+    justify-content:space-between;
+    margin:0.2em;
+    padding:0.2em;
+    border:1px solid #d8d8d8;
+    box-sizing:border-box;
+}
+.inputpanel input{
+    border-radius:5px;
+}
+.inputpanel input[type="text"]{
+    border:1px solid #d8d8d8;
+}
+</style>
+	</body>
+</html>

@@ -1,0 +1,63 @@
+#用来复制一个顶点组和骨骼以测试是否能分别对应不同动画
+sel_obj = bpy.context.selected_objects[0]
+arm = sel_obj.data
+
+import math,numpy
+duplicate_pair = numpy.array([
+["Left_eye","Left_Eye"],
+["L_highlight","L_Highlight"],
+["Right_eye","Right_Eye"],
+["R_highlight","R_Highlight"]
+])
+
+bpy.ops.object.mode_set(mode='EDIT')
+for pair in duplicate_pair:
+    if pair[1] in arm.edit_bones:
+        print('Info: Bone '+pair[1]+' Exists;skip')
+    else:
+        bpy.ops.armature.select_all(action='DESELECT')
+        arm.edit_bones.active = arm.edit_bones[pair[0]]
+        b = bpy.context.selected_editable_bones[0]
+        cb = arm.edit_bones.new(pair[1])
+        cb.head = b.head
+        cb.tail = b.tail
+        cb.matrix = b.matrix
+        cb.parent = b.parent
+        for pair in duplicate_pair:
+            if pair[0]==b.parent.name:
+                if pair[1] in arm.edit_bones:
+                    cb.parent = arm.edit_bones[pair[1]]
+                else:
+                    print('Info: Parent Redirection failed:'+pair[1])
+
+bpy.ops.object.mode_set(mode='OBJECT')
+for obj in [o for o in bpy.data.objects if o.type == 'MESH']:
+    if obj.parent==sel_obj:
+        bpy.context.view_layer.objects.active=obj
+        #collect empty
+        all_groups = []
+        for group in obj.vertex_groups:
+            all_groups.append(group.index)
+        assigned_groups = []
+        for vertex in obj.data.vertices:
+            for group in vertex.groups:
+                assigned_groups.append(group.group)
+        assigned_groups = list(set(assigned_groups))
+        empty_groups = [x for x in all_groups if x not in assigned_groups]
+        #end of collect empty
+        for pair in duplicate_pair:
+            if pair[1] in bpy.context.active_object.vertex_groups:
+                print('Info: '+pair[1]+' Exists;skip')
+            elif pair[0] in bpy.context.active_object.vertex_groups:
+                bpy.context.active_object.vertex_groups.active = bpy.context.active_object.vertex_groups[pair[0]]
+                if bpy.context.active_object.vertex_groups.active.index in empty_groups:
+                    print('Info: '+pair[0]+' is empty;skip')
+                else:            
+                    bpy.ops.object.vertex_group_copy()
+                    v1 = bpy.context.active_object.vertex_groups[len(bpy.context.active_object.vertex_groups)-1]
+                    v1.name = pair[1]
+            else:
+                print('Info: '+pair[0]+' Not Exists;skip')
+    else:
+        print('skip mesh:'+obj.name)
+

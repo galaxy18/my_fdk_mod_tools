@@ -1,0 +1,6 @@
+for obj in bpy.data.objects:
+    if obj.parent_type=='BONE' and obj.type == "EMPTY":
+        obj.rotation_quaternion = Quaternion([1,0,0,0])
+        obj.scale = [1.0,1.0,1.0]
+    elif obj.type == "EMPTY":
+        print(obj.name)

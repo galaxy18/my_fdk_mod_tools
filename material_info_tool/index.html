@@ -1,0 +1,721 @@
+<html>
+	<head>
+		<script
+			src="https://code.jquery.com/jquery-3.7.1.min.js"
+			integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+			crossorigin="anonymous"></script>
+		<script src="./data/json-viewer/jquery.json-viewer.js"></script>
+		<link href="./data/json-viewer/jquery.json-viewer.css" type="text/css" rel="stylesheet">
+		<script src="./data/shader_b.js"></script>
+		<script src="./data/shader_c.js"></script>
+		<script src="./data/shader_ef.js"></script>
+		<script src="./data/shader_equ.js"></script>
+		<script src="./data/shader_m.js"></script>
+		<!--script src="./data/shader_obj.js"></script-->
+		<script src="./data/shader_others.js"></script>
+	</head>
+	<body>
+	<script>
+var init = false;
+var black='#DBDBDB';
+var settings={};
+var refsettings={};
+var dragged=null;
+var dragged_shader=null;
+var refobj=null;
+var initvalue=null;
+function selectfile(input){
+	if (input.files&&input.files[0]){
+		var file = input.files[0];
+		processfile(file);
+	}
+	input.value='';
+}
+function processfile(file){
+	var reader = new FileReader();
+	reader.onload = function (e) {
+		settings=JSON.parse(e.target.result);
+		loadsettings();
+		localStorage.setItem("filename", file.name);
+		$('#filename').html(file.name);
+	}
+	reader.readAsText(file);
+}
+function loadstorage(){
+	var storageObj=localStorage.getItem("settings");
+	if(storageObj!=null){
+		try{
+			settings=JSON.parse(storageObj);
+			loadsettings();
+			var reffilename = localStorage.getItem("filename");
+			if(reffilename!=null){
+				$('#filename').html(reffilename);
+			}
+		}catch(e){}
+	}
+	var refstorageObj=localStorage.getItem("refsettings");
+	if(refstorageObj!=null){
+		try{
+			refsettings=JSON.parse(refstorageObj);
+			loadrefsettings();
+		}catch(e){}
+	}
+	if(window.location.search.indexOf('is1st')>=0){
+		$('[name=is1st]').trigger('click');
+	}
+}
+function clearstorage(){
+	localStorage.removeItem("settings");
+	localStorage.removeItem("filename");
+}
+function loadsettings(){
+	initvalue=JSON.parse(JSON.stringify(settings));
+	$('#output').show();
+	$('#inputfile').val(JSON.stringify(settings,null,'\t'));
+	$('#nav').empty();
+	$('#editor').empty();
+	settings.map(function(e,i){
+		e['id_referenceonly']=i;
+	});
+	processsettings();
+	$('#selectfile span').html('重选文件');
+}
+function processsettings(){
+	for(var i=0;i<settings.length;i++){
+		createdom(i);
+	}
+	function createdom(i2,_orig_id){
+		var reseters=[];
+		var orig_id=_orig_id==null?i2:_orig_id;
+		var _value = settings[i2];
+		var _orgvalue=JSON.parse(JSON.stringify(settings[i2]));
+		var _content=$('<div>',
+			{'class':'content','style':'flex:1 1 30%;border:1px solid '+black+';padding:0.2em;display:flex;margin:0.2em;border-radius:1em;box-sizing:border-box;'});
+		var _dom = $('<div>',{'style':'flex:0 0 auto;'});
+		_content.append(_dom);
+		_content.append($('<div>',{'style':'flex:1 1 auto;'}));
+		$('#editor').append(_content);
+		
+		var shader_node;
+		var _navdom;
+		handle_shader();
+		createnavbtn();
+		
+		$.each(Object.keys(_value),function(i3,key){
+			var _pair = $('<div>',{'style':'display:flex;white-space:nowrap;justify-content: space-between;'});
+			_dom.append(_pair);
+	//material_name		
+			if(key=='material_name'){
+				var material_name_input = $('<input>',{'type':'text','value':_value[key]});
+				material_name_input.keyup(function(e){
+					setvalue(this,_value,this.value,orig_id,key);
+					_navdom.html(_value[key]);
+				});
+				_pair.css('margin','0.2em');
+				_pair.append($('<div>',{'title':key}).append("材质名称"))
+				.append(material_name_input);
+				_navdom.html(_value[key]);
+				reseters.push(function(){
+					setvalue(material_name_input,_value,initvalue[orig_id][key],i2,key);
+				});
+	//shader_name
+			}else if(key=='shader_name'){
+				_pair.append($('<div>').append('Shader')).append(shader_node);
+				shader_node.append($('<div>').append(_value[key]));
+				var shaderoption_node = $('<div>',{'class':'shaderoptions','style':'margin:0.2em;'});
+				for(var i4=0;i4<_value['shaders'].length;i4++){
+					var shaderoption = _value['shaders'][i4];
+					var shaderoptiondom = $('<div>',{'style':'border:1px solid '+black+';padding:0.5em;'});
+					var shaderoption_name=$('<div>',{'style':'white-space:nowrap;overflow: hidden;text-overflow: ellipsis;max-width:10em;',
+						'title':shaderoption['shader_name']})
+						.append(shaderoption['shader_name']);
+					shaderoptiondom.append(shaderoption_name);
+					if(shaderoption['shader_name'].indexOf('Switch_')==0){//readonly
+						shaderoptiondom.append('type_int:'+shaderoption['type_int']+';data:'+shaderoption['data']);
+					}else{
+						$.each(Object.keys(shaderoption),function(i5,key2){
+							if(key2=='type_int'||key2=='data'){
+								var shadervaluepair = $('<div>',{'style':'display:flex;white-space:break-spaces;justify-content: space-between;'});
+								shaderoptiondom.append(shadervaluepair);
+								var shaderoption_data = $('<input>',{'type':'text','value':shaderoption[key2],'shader_index':i4,'placeholder':shaderoption[key2]});
+								shaderoption_data.keyup(function(e){
+									setvalue(this,_value,this.value,orig_id,'shaders',shaderoption_data.attr('shader_index'),key2,
+									//resetvalue if empty
+									shaderoption_data.attr('placeholder'));
+								});
+								shadervaluepair.append($('<div>').append(key2+':')).append(shaderoption_data);
+							}
+						});
+					}
+					shaderoption_node.append(shaderoptiondom);
+				}
+				shaderoption_node.append('<hr/>');
+				shaderoption_node.append($('<div>').append('material_switches;readonly'));
+				shaderoption_node.append('<hr/>');
+				for(var i4=0;i4<_value['material_switches'].length;i4++){//readonly
+					var material_switch = _value['material_switches'][i4];
+					var shaderoptiondom = $('<div>',{'style':'border:1px solid '+black+';padding:0.5em;'});
+					var shaderoption_name=$('<div>',{'style':'white-space:nowrap;overflow: hidden;text-overflow: ellipsis;max-width:10em;',
+						'title':material_switch['material_switch_name']})
+						.append(material_switch['material_switch_name']);
+					shaderoptiondom.append(shaderoption_name);
+					shaderoptiondom.append('int2:'+material_switch['int2']);
+					shaderoption_node.append(shaderoptiondom);
+				}
+				var shaderoptions = $('<div>',{'style':'display:flex;white-space:break-spaces;justify-content: space-between;'}).append('Shader<br />Options').append(shaderoption_node);
+				_dom.append(shaderoptions);
+				_pair.on('click',function(){
+					shaderoptions.toggle(200);
+				});
+				shaderoptions.hide();
+	//textures
+			}else if(key=='textures'){
+				_pair.append($('<div>',{'title':key}).append("贴图"));
+				var texture_node=$('<div>',{'class':'textures','style':'margin:0.2em;'});
+				_pair.append(texture_node);
+				
+				var textures = _value[key];
+				$.each(textures,function(i4,key2){
+					var texture = textures[i4];
+					var texturedom = createtexturenodedom(texture,i4);
+					texture_node.append(texturedom);
+				});
+				if(textures.length==0){
+					texture_node.append("（无）");
+				}
+			}else if(key=='shader_switches_hash_referenceonly'){
+				shader_node.append($('<div>').append(_value[key]));
+			}else{
+				_pair.addClass('readonly');
+				_pair.append($('<div>').append(key+':'))
+				.append($('<div>').append(_value[key]));
+			}
+		});
+		
+		function handle_shader(){
+			shader_node = $('<div>',
+				{'style':'border:1px solid '+black+';padding:0.2em;margin:0.2em;',
+				'draggable':'true'});
+			var shader_hash=_value['shader_name']+'#'+_value['shader_switches_hash_referenceonly'];
+			var orig_shader_hash=shader_hash;
+			shader_node.on("dragstart", function(event){
+				dragged_shader = shader_hash;
+				refobj=_value;
+			});
+			shader_node.on("drop", function(event){
+				if(dragged_shader!=null&&dragged_shader!=shader_hash){
+					var newobj=$.extend(true,{},refobj);
+					delete newobj['charaids'];
+					newobj['material_name']=_value['material_name'];
+					newobj['textures']=_value['textures'];
+					newobj['shaders']=newobj['shaders'].map(function(shadernode,shadernode_index){
+						if(shadernode['shader_name'].indexOf('Switch_')==0){
+							//item starts with Switch_ should be readonly
+						}else{
+							var shader_name=shadernode['shader_name'];
+							var origshader=_value['shaders'].filter(function(_shadernode){
+								return _shadernode['shader_name']==shadernode['shader_name'];
+							});
+							if(origshader.length>0){
+								origshader=origshader[0];
+								if($('[name=is1st]')[0].checked===false){
+									shadernode['data']=origshader['data'];
+								}
+							}
+						}
+						return shadernode;
+					});
+					newobj['uv_map_indices']=_value['uv_map_indices'];
+					
+					settings.splice(i2+1,0,$.extend(true,{},newobj));
+					var __dom = createdom(i2+1,i2);
+					__dom[0].insertAfter(_navdom);
+					__dom[1].insertAfter(_content);
+					action_removenode();
+					printfile();
+				}
+			});
+		}
+		function createnavbtn(){
+			_navdom=$('<button>');
+			if(initvalue.length<=i2){
+				_navdom.addClass('changed');
+			}
+			_navdom.on('click',function(){
+				_content[0].scrollIntoView({ 'behavior': "smooth"});
+				$('.active').removeClass('active');
+				_navdom.addClass('active');
+				_content.addClass('active');
+			});
+			_content.on('click',function(){
+				$('.active').removeClass('active');
+				_navdom.addClass('active');
+				_content.addClass('active');
+			});
+			$('#nav').append(_navdom);
+			reseters.push(function(){
+				_value['removed']=false;
+				_navdom.removeClass('removed');
+				_content.removeClass('removed');
+			});
+		}
+		function createtexturenodedom(texture,i4){
+			var key='textures';
+			var texturedom = $('<div>',{'style':'border:1px solid '+black+';padding:0.5em;'});
+			var texture_image_input;
+			texturedom.on('drop',function(e){
+				if(dragged!=null){
+					e.preventDefault();  
+					e.stopPropagation();
+					setvalue(texture_image_input,_value,dragged,orig_id,key,
+						i4,'texture_image_name');
+					dragged=null;
+				}
+			});
+			$.each(Object.keys(texture),function(i5,key3){
+				var texturevaluepair = $('<div>',
+					{'style':'display:flex;white-space:nowrap;justify-content: space-between;'});
+				texturedom.append(texturevaluepair);
+//texture_image_name
+				if(key3=='texture_image_name'){
+					texture_image_input = $('<input>',{'type':'text','value':texture[key3]});
+					texture_image_input.keyup(function(e){
+						if(this.value.lastIndexOf('.')>=0){
+							this.value=this.value.substr(0,this.value.lastIndexOf('.'));
+						}
+						setvalue(this,_value,this.value,orig_id,key,i4,key3);
+					});
+					texturevaluepair.append($('<div>',{'title':key3}).append('文件'))
+					.append(texture_image_input);
+//texture_slot
+				}else if(key3=='texture_slot'){
+					var texture_slot_input = $('<input>',{'type':'text','value':texture[key3]});
+					texture_slot_input.keyup(function(e){
+						setvalue(this,_value,this.value,orig_id,key,i4,key3);
+					});
+					texturevaluepair.append($('<div>',{'title':key3}).append('槽:'))
+					.append(texture_slot_input);
+				}else{
+					texturevaluepair.addClass('readonly');
+					texturevaluepair.append($('<div>').append(key3+':'))
+					.append($('<div>').append(texture[key3]));
+				}
+			});
+			reseters.push(function(){
+				setvalue(texture_image_input,_value,initvalue[orig_id][key][i4]['texture_image_name'],orig_id,key,
+					i4,'texture_image_name');
+			});
+			return texturedom;
+		}
+		function action_resetnode(e){
+			if(initvalue.length>i2){
+				$.each(reseters,function(i6,key4){
+					reseters[i6]();
+				});
+				reseters=[];
+			}
+			printfile();
+		}
+		function action_copynode(e){
+			e.stopPropagation();
+			var __value = JSON.parse(JSON.stringify(_value));
+			__value['removed']=false;
+			settings.push(__value);
+			settings.map(function(e1,i5){
+				e1['id_referenceonly']=i5;
+			});
+			createdom(settings.length-1);
+			printfile();
+		}
+		function action_copyorignode(e){
+			e.stopPropagation();
+			settings.push(_orgvalue);
+			settings.map(function(e1,i5){
+				e1['id_referenceonly']=i5;
+			});
+			createdom(settings.length-1);
+			printfile();
+		}
+		function action_removenode(){
+			_value['removed']=true;
+			_content.addClass('removed');
+			_navdom.addClass('removed');
+			btnrestore.show();
+			btnremove.hide();
+			printfile();
+		}
+		function action_restorenode(){
+			delete _value['removed'];
+			_content.removeClass('removed');
+			_navdom.removeClass('removed');
+			btnrestore.hide();
+			btnremove.show();
+			printfile();
+		}
+		
+		var btnreset = $('<button>').append('复原节点').on('click',action_resetnode);
+		var btncopy = $('<button>').append('复制').on('click',action_copynode);
+		var btncopy2 = $('<button>').append('以原始值<br/>复制节点').on('click',action_copyorignode);
+		var btnremove = $('<button>').append('移除节点').on('click',action_removenode);
+		var btnrestore = $('<button>').append('恢复节点').on('click',action_restorenode);
+		var buttonspanel = $('<div>',{'style':'flex:0 0 auto;display:flex;flex-direction:column;'});
+		if(initvalue.length>i2&&_orig_id==null){
+			buttonspanel.append(btnreset);
+		}
+		buttonspanel.append(btncopy)
+			.append(btncopy2)
+			.append(btnremove)
+			.append(btnrestore);
+		_content.append(buttonspanel);
+		btnrestore.hide();
+		return [_navdom,_content];
+	}
+	printfile();
+}
+function savefile(){
+	var storageObj=settings.filter(function(e){
+		return e.removed!==true;
+	}).map(function(e,i){
+		e['id_referenceonly']=i;
+		return e;
+	});
+	localStorage.setItem("settings", JSON.stringify(storageObj));
+}
+function printfile(){
+	var storageObj=settings.filter(function(e){
+		return e.removed!==true;
+	}).map(function(e,i){
+		e['id_referenceonly']=i;
+		return e;
+	});
+	$('#result').val(JSON.stringify(storageObj,null,'\t'));
+	return storageObj;
+}
+function updatepreview(){
+	var storageObj=settings.filter(function(e){
+		return e.removed!==true;
+	}).map(function(e,i){
+		e['id_referenceonly']=i;
+		return e;
+	});
+	if($.prototype.jsonViewer){
+		$('#jsonrenderer').jsonViewer(storageObj);
+	}
+}
+function downloadfile(){
+	var storageObj=printfile();
+	var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(storageObj,null,'\t'));
+	var dlAnchorElem = document.getElementById('downloadAnchorElem');
+	dlAnchorElem.setAttribute("href",dataStr);
+	dlAnchorElem.setAttribute("download", "material_info.json");
+	dlAnchorElem.click();
+}
+function setvalue(input,obj,value,orig_id,field,texture_id,texturefie_id,resetvalue){
+	if(input!=null){
+		input = $(input);
+		input.val(value.trim());
+	}
+	if(field=='textures'){
+		if(texture_id!=null&&texturefie_id!=null){
+			if(texturefie_id=='texture_slot'){
+				obj[field][texture_id][texturefie_id]=Number(value);
+			}else{
+				obj[field][texture_id][texturefie_id]=value;
+			}
+			if(input!=null&&initvalue[orig_id]){
+				input.toggleClass('changed',initvalue[orig_id][field][texture_id][texturefie_id]!=value);
+			}
+		}
+	}else if(field=='shaders'){
+		if(texture_id!=null&&texturefie_id!=null){
+			if(texturefie_id=='type_int'){
+				obj[field][texture_id][texturefie_id]=Number(isNaN(value)?resetvalue:value);
+			}else if(texturefie_id=='data'){
+				if(value==''||value==null){value=resetvalue;}
+				if(value.indexOf(',')>=0){
+					value=value.split(',').map(function(e){return isNaN(e)?0.0:Number(e);});
+				}else{
+					value=Number(isNaN(value)?resetvalue:value);
+				}
+				obj[field][texture_id][texturefie_id]=value;
+			}
+		}
+	}else{
+		obj[field]=value;
+		if(input!=null&&initvalue[orig_id]){
+			input.toggleClass('changed',initvalue[orig_id][field]!=value);
+		}
+	}
+	printfile();
+}
+function processimage(file){
+	var reader = new FileReader();
+	reader.onload = function (event) {
+		var Img = $('<img>');
+		var filename = file.name.split('.').slice(0, -1).join('.');
+		var filenamebox = $('<input>',{'type':'text','value':filename,'style':'display:none;'});
+		Img.on('click',function(){
+			filenamebox.select();
+			document.execCommand('copy', true);
+		});
+		Img.on("dragstart", function(event){
+			dragged = filename;
+		});
+		filenamebox.on('click',function(){
+			this.select();
+			document.execCommand('copy', true);
+		});
+		$('#images').append(filenamebox).append(Img);
+		Img.attr('src',event.target.result);
+	};
+	reader.readAsDataURL(file);
+}
+
+function selectreffile(input){
+	if (input.files&&input.files[0]){
+		var file = input.files[0];
+		processreffile(file);
+	}
+	input.value='';
+}
+function processreffile(file){
+	var reader = new FileReader();
+	reader.onload = function (e) {
+		refsettings=JSON.parse(e.target.result);
+		loadrefsettings();
+	}
+	reader.readAsText(file);
+}
+function loadrefsettings(){
+	$('#shaderref').show();
+	$('#refnav').empty();
+	$('#refnodes').empty();
+	processsrefettings();
+}
+function processsrefettings(){
+	localStorage.setItem("refsettings", JSON.stringify(refsettings));
+	$.each(refsettings,function(i7,key5){
+		var _value=refsettings[i7];
+		var shader_node=$('<div>',{'style':'display:flex;margin:0.2em;padding:0.5em;border:1px solid '+black+';box-sizing:border-box;justify-content:space-between;user-select:none;','draggable':'true'});
+		$('#refnodes').append(shader_node);
+		var shader_hash=_value['shader_name']+'#'+_value['shader_switches_hash_referenceonly'];
+		shader_node.append($('<div>').append(_value['material_name']));
+		shader_node.append($('<div>').append(shader_hash));
+		shader_node.on("dragstart", function(event){
+			dragged_shader = shader_hash;
+			refobj=_value;
+		});
+		var _navdom=$('<button>').append(_value['material_name']);
+		_navdom.on('click',function(){
+			shader_node[0].scrollIntoView({ 'behavior': "smooth"});
+			$('.refactive').removeClass('refactive');
+			_navdom.addClass('refactive');
+			shader_node.addClass('refactive');
+		});
+		$('#refnav').append(_navdom);
+	});
+}
+function processglobaldef(globalkey){
+	try{
+	function generaterefnode(key){
+		var shader_defs=window[globalkey][key];
+		$('#shadernodes2').empty();
+		$.each(Object.keys(shader_defs),function(index2,key2){
+			var _value=shader_defs[key2];
+			var shader_hash=_value['shader_name']+'#'+_value['shader_switches_hash_referenceonly'];
+			var _node = $('<div>',{'style':'display:flex;margin:0.2em;padding:0.5em;border:1px solid #DBDBDB;box-sizing:border-box;justify-content:space-between;user-select:none;cursor:pointer;','draggable':'true'})
+			.append(key2+'\t('+_value['charaids'][0]+')').data('charaids',_value['charaids']).on("dragstart", function(event){
+				dragged_shader = shader_hash;
+				refobj=_value;
+			});
+			var filterkey=$('#filterref').val().trim().toLowerCase();
+			if(filterkey!=''){
+				_node.toggleClass('filtered',!(_value['charaids'].filter(function(e){
+					return e.toLowerCase().indexOf(filterkey)>=0;
+				}).length>0));
+			}
+			$('#shadernodes2').append(_node);
+		});
+	}
+	function generaterefnav(){
+		$.each(Object.keys(window[globalkey]),function(index,key){
+			var _nav = $('<div>',{'style':'display:flex;margin:0.2em;padding:0.5em;border:1px solid #DBDBDB;box-sizing:border-box;justify-content:space-between;user-select:none;cursor:pointer;'})
+			.append(key).on('click',function(){
+				$('.refactive2').removeClass('refactive2');
+				generaterefnode(key);
+				_nav.addClass('refactive2');
+			});
+			$('#shadernav2').append(_nav);
+			if(index==0){
+				generaterefnode(key);
+				_nav.addClass('refactive2');
+				
+			}
+		})
+	}
+	var btn=$('<div>',{'style':'display:flex;margin:0.2em;padding:0.5em;border:1px solid #DBDBDB;box-sizing:border-box;justify-content:space-between;user-select:none;cursor:pointer;'}).append(globalkey);
+	$('#shadernav3').append(btn);
+	btn.on('click',function(){
+		$('.refnav2active').removeClass('refnav2active');
+		$('#shadernav2').empty();
+		$('#filterref').val('');
+		generaterefnav(globalkey);
+		btn.addClass('refnav2active');
+	});
+	}catch(e){
+		console.log(e);
+	}
+	init=true;
+}
+	</script>
+<div style="display:flex;height:100%;width:100%;">
+	<div style="flex:0 0 50vw;display:flex;flex-direction:column;overflow: auto;">
+		<div style="flex:0 0 auto;">
+			<div style="display:flex;flex-wrap:wrap;margin-bottom:0.5em;">
+				<div>当前文件：<span id="filename" style="margin-right:1em;">无</span></div>
+				<label id="selectfile" style="cursor:pointer;border:1px solid black;margin-right:1em;"><input type="file" id="avatar" name="avatar" accept="application/json" onchange="selectfile(this)" style="display:none"/><span>选择文件</span>或者拖动文件到窗口</label>
+				<label id="selectreffile" style="cursor:pointer;border:1px solid black;"><input type="file" id="avatar" name="avatar" accept="application/json" onchange="selectreffile(this)" style="display:none"/><span>选择参考文件</span></label>
+				<label><input type="checkbox" name="is1st">空re（不复制shader data）</label>
+			</div>
+			<div>
+			<textarea id="inputfile" style="width:100%;height:20vh;display:none;"></textarea>
+			</div>
+			<div style="display:flex">
+				<div id="images" style="display:flex;overflow:auto;"></div>
+			</div>
+			<div style="display:flex">
+				<div style="white-space:nowrap;">节点一览：</div>
+				<div id="nav" style="display:flex;overflow:auto;flex-wrap:wrap;max-height:4em;">无</div>
+			</div>
+		</div>
+		<div id="editor" style="flex:1 1 auto;overflow:auto;display:flex;flex-wrap:wrap;margin:0.2em 0;"></div>
+	</div>
+	<div style="flex: 1 1 auto;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;">
+		<div id="shaderref" style="flex: 0 0 30%;display:flex;flex-direction:column;border:1px solid darkblue;margin:0.2em;padding:0.2em;border-radius:10px;overflow:hidden;box-sizing:border-box;">
+			<div style="flex:0 0 auto;display:flex">
+				<div style="white-space:nowrap;">参考文件 节点一览：</div>
+				<div id="refnav" style="display:flex;overflow:auto;flex-wrap:wrap;max-height:4em;">无</div>
+			</div>
+			<div id="refnodes" style="flex:1 1 auto;overflow:auto;"></div>
+		</div>
+		<div style="flex: 0 0 30%;display:flex;flex-direction:column;border:1px solid darkblue;margin:0.2em;padding:0.2em;border-radius:10px;overflow:hidden;box-sizing:border-box;">
+			<div style="display:flex;align-items:center;">
+				<div id="shadernav3" style="flex:1 1 auto;display:flex;flex-wrap:wrap;"></div>
+				<div><input type="text" id="filterref" /></div>
+			</div>
+			<div id="shaderref2" style="display:flex;flex-direction:row;overflow:hidden;box-sizing:border-box;">
+				<div id="shadernav2" style="overflow:auto;flex:0 0 auto;"></div>
+				<div id="shadernodes2" style="overflow:auto;display:flex;flex-wrap:wrap;"></div>
+			</div>
+		</div>
+		<div id="output" style="flex: 1 1 auto;display:flex;flex-direction:column;box-sizing:border-box;overflow:auto;">
+			<div style="flex: 1 1 auto;overflow:auto;box-sizing:border-box;display:flex;">	
+				<div style="flex: 1 1 50%;overflow:auto;box-sizing:border-box;margin-right:0.2em;">
+					<textarea id="result" style="height:100%;width:100%;" onfocus="$(this).select();"></textarea>
+				</div>
+				<div style="flex: 1 1 50%;overflow:auto;border:1px solid black;box-sizing:border-box;">
+					<pre style="height:100%;width:100%;" id="jsonrenderer"></pre>
+				</div>
+			</div>
+			<div style="display:flex;flex:0 0 auto;margin:0.5em;">
+				<button onclick="clearstorage()">清除暂存</button>
+				<button onclick="loadstorage()">复原暂存</button>
+				<button onclick="savefile()">覆盖保存暂存</button>
+				<button onclick="updatepreview()">更新JSON</button>
+				<!--button onclick="printfile()">生成JSON</button-->
+				<div style="flex:1 1 auto;"></div>
+				<button onclick="downloadfile()">下载JSON</button>
+				<a id="downloadAnchorElem" style="display:none"></a>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+$('#output').hide();
+$('#shaderref').hide();
+$("html").on("dragover", function(event) {
+    event.preventDefault();  
+    event.stopPropagation();
+    //$(this).addClass('dragging');
+});
+
+$("html").on("dragleave", function(event) {
+    event.preventDefault();  
+    event.stopPropagation();
+    //$(this).removeClass('dragging');
+});
+$("html").on("drop", function(e) {
+    e.preventDefault();  
+    e.stopPropagation();
+    if(e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files.length) {
+		var files = e.originalEvent.dataTransfer.files;
+		if(files && files[0]){
+			$.each(files,function(i,k){
+				if(files[i].name.endsWith('.json')){
+					processfile(files[i]);
+				}else{
+					processimage(files[i]);
+				}
+			});
+		}
+	}
+});
+loadstorage();
+if(window.shader_b){
+	var globalkey='shader_b';
+	processglobaldef(globalkey);
+}
+if(window.shader_c){
+	var globalkey='shader_c';
+	processglobaldef(globalkey);
+}
+if(window.shader_ef){
+	var globalkey='shader_ef';
+	processglobaldef(globalkey);
+}
+if(window.shader_equ){
+	var globalkey='shader_equ';
+	processglobaldef(globalkey);
+}
+if(window.shader_m){
+	var globalkey='shader_m';
+	processglobaldef(globalkey);
+}
+if(window.shader_obj){
+	var globalkey='shader_obj';
+	processglobaldef(globalkey);
+}
+if(window.shader_others){
+	var globalkey='shader_others';
+	processglobaldef(globalkey);
+}
+$('#shadernav3>div:nth-child(1)').trigger('click');
+$('#filterref').on('keyup',function(){
+	var key=$('#filterref').val().trim().toLowerCase();
+	if(key==''){
+		$('.filtered').removeClass('filtered');
+	}else{
+		$('#shadernodes2 div').each(function(i8,elem){
+			elem=$(elem);
+			var charaids=elem.data('charaids');
+			elem.toggleClass('filtered',!(charaids.filter(function(e){
+				return e.toLowerCase().indexOf(key)>=0;
+			}).length>0));
+		});
+	}
+});
+</script>
+<style>
+.readonly{color:gray;display:none !important;}
+.removed{border-color:red !important;color:gray !important;}
+.content.removed .textures{
+	-display:none;
+}
+img{max-width:3em;}
+.active,.refactive,.refactive2,.refnav2active{background-color:lightcyan;}
+.changed{font-weight:600;}
+input[type='text']{width:10em;}
+.filtered{display:none !important;}
+</style>
+	</body>
+</html>

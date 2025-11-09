@@ -1,0 +1,70 @@
+#arr_base   用来复制骨骼定位
+#arr_add    用来根据父骨骼添加缺失子骨骼
+#ref
+arm0= bpy.context.selected_objects[0].data
+#target
+arm = bpy.context.selected_objects[1].data
+
+arr_base = [
+#"LeftShoulder","RightShoulder"
+#"Spine1"
+]
+arr_add = [
+#"Bone_hair_tail1",
+#"Bone_Rcloth_front1","Bone_Lcloth_front1","Bone_hipbelt1",
+#"Bone_swallow_in_root","Bone_Rswallow_out1","Bone_Lswallow_out1",
+#"Head",
+#"Bone_Lleg_belt","Bone_Rleg_belt"
+#"LeftLeg"
+"Head"
+]
+
+arr_ignore=[]
+arr_add_ignore=["Bone_eye_root"]
+
+def create_Bone(b_orig):
+    print('creating '+b_orig.name)
+    b = arm.edit_bones.new(b_orig.name)
+    b.head = b_orig.head
+    b.tail = b_orig.tail
+    b.matrix = b_orig.matrix
+    if arm.edit_bones.get(b_orig.parent.name) is None:
+        create_Bone(b_orig.parent)
+    b.parent = arm.edit_bones[b_orig.parent.name]
+    for child in b_orig.children:
+        if (arm.edit_bones.get(child.name) is None) and (not b_orig.name in arr_add_ignore):
+            create_Bone(child)
+    
+def processchild(b_child):
+    try:
+        if arm.edit_bones.get(b_child.name) is None:
+            create_Bone(b_child)
+            #print(b_child.name)
+        elif not b_child.name in arr_ignore:
+            b=arm.edit_bones[b_child.name]
+            b.tail = [b.tail[0]-b.head[0]+b_child.head[0],
+                b.tail[1]-b.head[1]+b_child.head[1],
+                b.tail[2]-b.head[2]+b_child.head[2]]
+            b.head = b_child.head
+            #b.matrix = b_child.matrix
+            #b.parent = b_child.parent
+    except Exception as e: print(e)
+    for child in b_child.children:
+        processchild(child)
+
+bpy.ops.object.mode_set(mode='EDIT')
+for basename in arr_base:
+    processchild(arm0.edit_bones[basename])
+    
+for basename in arr_add:
+    b0 = arm0.edit_bones.get(basename)
+    if b0 is not None:
+        if arm.edit_bones.get(b0.name) is None:
+            create_Bone(b0)
+        else:
+            for child in b0.children:
+                if arm.edit_bones.get(child.name) is None:
+                    create_Bone(child)
+    
+bpy.ops.object.mode_set(mode='OBJECT')
+

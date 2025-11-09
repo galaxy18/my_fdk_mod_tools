@@ -1,0 +1,78 @@
+#https://www.cnblogs.com/jingzaixin/p/18144987
+#bpy.ops.screen.keyframe_jump(next=True)
+
+import bpy,mathutils,math
+
+bones=[
+"kuchi_up",
+"Left_up_kuchi",
+"Right_up_kuchi",
+"Left_up_mabu01",
+"Left_up_mabu02",
+"Left_eye_Orig",
+"L_highlight",
+"Left_down_mabu02",
+"Left_up_mabu03",
+"Left_mayu01",
+"Left_mayu02",
+"Left_mayu03",
+"Right_up_mabu01",
+"Right_mayu01",
+"Right_mayu02",
+"Right_up_mabu02",
+"Right_eye_Orig",
+"R_highlight",
+"Right_down_mabu02",
+"Right_up_mabu03",
+"Right_mayu03",
+"ago",
+"down_kuchi",
+"Left_down_kuchi",
+"Right_down_kuchi",
+"ha_down",
+"tongue_root",
+"tongue01",
+"tongue02",
+"ha_up",
+"Left_side_kuchi",
+"Right_side_kuchi",
+"Left_hoho",
+"Right_hoho",
+"Left_down_mabu03",
+"Left_down_mabu01",
+"Right_down_mabu01",
+"Right_down_mabu03",
+"Left_mayu",
+"Right_mayu"]
+bones=["Left_up_mabu01","Left_up_mabu02","Left_up_mabu03","Left_down_mabu02","Left_down_mabu03"]
+armature = bpy.data.objects.get(bpy.context.active_object.data.name)
+arm1=bpy.data.objects["Up_Point"]
+arm2=bpy.data.objects["Armature.001"]
+action = armature.animation_data.action
+root1=armature.pose.bones.get("Face_Root")
+root2=arm1.pose.bones.get("Face_Root")
+root3=arm2.pose.bones.get("Face_Root")
+
+for name in bones:
+    try:
+        bone1=armature.pose.bones.get(name)
+        bone2=arm1.pose.bones.get(name)
+        bone3=arm2.pose.bones.get(name)
+        pos2=bone2.head-root2.head
+        pos3=bone3.head-root3.head
+        ratio=[pos2[0]/pos3[0],pos2[1]/pos3[1],pos2[2]/pos3[2]]
+        offset=[pos2[0]-pos3[0],pos2[1]-pos3[1],pos2[2]-pos3[2]]
+        print(ratio)
+        for kp in C.object.animation_data.action.fcurves[0].keyframe_points:
+            pos1 = bone1.location-root1.location
+            location = mathutils.Vector((pos1[0]/ratio[0], pos1[1]/ratio[1], pos1[1]/ratio[1]))
+            #bone1.location = location+root1.location
+            bone1.location.x-=offset[0]#bone2.head[0]-bone3.head[0]
+            bone1.location.y-=offset[1]#bone2.head[1]-bone3.head[1]
+            bone1.location.z-=offset[2]#bone2.head[2]-bone3.head[2]
+            bone1.keyframe_insert(data_path="location", frame=kp.co[0])
+    except Exception as e: print(name)
+
+
+armature = bpy.data.objects.get(bpy.context.active_object.data.name)
+armature.pose.bones.get("Left_up_mabu01").location

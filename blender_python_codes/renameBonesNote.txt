@@ -1,0 +1,61 @@
+#headkey    用来自动重命名所有脸部骨骼，headkey是根
+#arr_copy   复制一份原名骨骼以应对定位
+import bpy, array
+
+headkey="Face_Root"
+arr_ignore = ["Head"
+#,"Left_Eye","Right_Eye","L_HighLight","R_HighLight"
+#,"Left_Up_Eye01","Left_Up_Eye02","Left_Up_Eye03"
+#,"Left_Down_Eye"
+#,"Left_EyeBlow01","Left_EyeBlow02","Left_EyeBlow03","Left_EyeBlow04"
+#,"Right_Up_Eye01","Right_Up_Eye02","Right_Up_Eye03"
+#,"Right_Down_Eye"
+#,"Right_EyeBlow01","Right_EyeBlow02","Right_EyeBlow03","Right_EyeBlow04"
+#,"Up_Teeth","Up_Mouth"
+#,"Left_Up_Mouth","Left_Side_Mouth"
+#,"Right_Up_Mouth","Right_Side_Mouth"
+#,"Jaw"
+#,"Down_Mouth","Left_Down_Mouth","Down_Teeth","Right_Down_Mouth"
+#,"Up_Mouth","Left_Up_Mouth","Left_Side_Mouth"
+]
+arr_copy = [
+#"Face_Root",
+"Left_Eye","Right_Eye","Left_eye","Right_eye"
+#"R_highlight","R_Highlight","L_highlight","L_Highlight"
+]
+bpy.ops.object.mode_set(mode='EDIT')
+bpy.ops.armature.select_all(action='DESELECT')
+arm = bpy.context.selected_objects[0].data
+newbones=[]
+for bonename in arr_copy:
+    bpy.ops.armature.select_all(action='DESELECT')
+    try:
+        arm.edit_bones.active = arm.edit_bones[bonename]
+        #print(bpy.context.selected_editable_bones[0].name)
+        b = bpy.context.selected_editable_bones[0]
+        cb = arm.edit_bones.new(bonename+"_Copy")
+        cb.head = b.head
+        cb.tail = b.tail
+        cb.matrix = b.matrix
+        cb.parent = b.parent
+        newbones.append(cb)
+        if headkey=="":
+            arm.edit_bones[bonename].name=bonename+"_Orig"
+    except:
+        print('')
+
+if not headkey=="":
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.armature.select_all(action='DESELECT')
+    arm.edit_bones.active = arm.edit_bones[headkey]
+    bpy.ops.armature.select_similar(type='CHILDREN')
+    for obj in bpy.context.selected_editable_bones:
+        if not (obj.name in arr_ignore or obj.name.endswith("_Copy") or obj.name.endswith("_New") or obj.name.endswith("_Orig")):
+            oldname = obj.name
+            obj.name = oldname+"_New"
+
+for obj in newbones:
+    obj.name = obj.name.replace("_Copy", "")
+
+bpy.ops.object.mode_set(mode='OBJECT')
+
