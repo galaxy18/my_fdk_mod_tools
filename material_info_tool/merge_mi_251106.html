@@ -11,7 +11,11 @@ var black='#DBDBDB';
 var targetfile=null;
 var reffile=null;
 var targetname='';
-function loadstorage(){}
+function loadstorage(){
+    if(window.location.search.indexOf('noCompare')>=0){
+        $('#togglepanel').trigger('click');
+    }
+}
 function clearstorage(){}
 function loadsettings(){}
 function savefile(){}
@@ -91,8 +95,7 @@ function getKeyName(key){
 }
 var DynamicBoneColliderMapping={};
 function createCollection(dom,key,index){
-    var nodedom=$('<div>',
-    {'class':'targetnode','style':'flex-wrap:wrap;border:1px solid blue;box-sizing:border-box;margin:0.2em;padding:0.2em;'});
+    var nodedom=$('<div>',{'class':'targetnode'});
     nodedom.on('click',function(e){
         e.stopPropagation();
         nodedom.toggleClass('removed');
@@ -116,13 +119,16 @@ function createCollection(dom,key,index){
                 targetfile[key][index]['removed']=nodedom.hasClass('removed')
             }))
         );
+    var titlename = $('<div>').append(
+        key=='DynamicBone'||key=='LookIK'?index:
+            (key=='TwoBoneIK'?targetfile[key][index].root:
+                targetfile[key][index].name));
     var title=$('<div>',{'style':'border:1px solid '+black+';box-sizing:border-box;margin:0.2em;padding:0.2em;'})
         .on('contextmenu',function(e){
             e.preventDefault();
             e.stopPropagation();
             panel.toggle();
-        }).append(key=='DynamicBone'||key=='LookIK'?index:(key=='TwoBoneIK'?targetfile[key][index].root:targetfile[key][index].name))
-        .append(panel);
+        }).append(titlename).append(panel);
     nodedom.append(title);
     if(key=='DynamicBoneCollider'){
         targetfile[key].map(function(e,i){DynamicBoneColliderMapping[e.name]=i;return e;});
@@ -150,7 +156,15 @@ function createCollection(dom,key,index){
                 inputtext.on('focusout',function(){
                     if(inputtext.val()=='true'||inputtext.val()=='false'||key2=='node'||key2=='name'){
                         targetfile[key][index][key2]=inputtext.val()=='true';
-                        console.log('input b');
+                        if(key=='DynamicBone'||key=='LookIK'||key=='TwoBoneIK'){
+                            console.log('input d');
+                        }
+                        else if(key2=='name'){
+                            titlename.html(inputtext.val());
+                            console.log('input b');
+                        }else{
+                            console.log('input e');
+                        }
                     }else{
                         targetfile[key][index][key2]=Number(inputtext.val());
                     }
@@ -169,19 +183,25 @@ function createCollection(dom,key,index){
                 .on('click',function(e){
                     e.stopPropagation();
                 }).hide();
+            var titlename2 = $('<div>').append(Joint.node);
             var title2=$('<div>',{'class':'JointContainer'})
                 .on('contextmenu',function(e){
                     e.preventDefault();
                     e.stopPropagation();
                     panel2.toggle();
-                }).append(Joint.node).append(panel2);
+                }).append(titlename2).append(panel2);
             nodedom.append(title2);
             Object.keys(Joint).forEach(key2=>{
                 var inputtext = $('<input>',{'type':'text','value':Joint[key2]});
                 inputtext.on('focusout',function(){
                     if(inputtext.val()=='true'||inputtext.val()=='false'||key2=='node'||key2=='name'){
                         targetfile['DynamicBone'][index]['Joint'][index2][key2]=inputtext.val()=='true';
-                        console.log('input c');
+                        if(key2=='node'){
+                            titlename2.html(inputtext.val());
+                            console.log('input f');
+                        }else{
+                            console.log('input c');
+                        }
                     }else{
                         targetfile['DynamicBone'][index]['Joint'][index2][key2]=Number(inputtext.val());
                     }
@@ -414,7 +434,7 @@ function processreffile(file){
 			<!-- <div style="display:flex;justify-content:flex-end;margin:0.2em;">过滤：<input type="text" id="filtertarget" /></div> -->
 		</div>
         <div style="display:flex;align-items:center;justify-content:center;">
-            <div class="actionbtn"
+            <div id="togglepanel" class="actionbtn"
             onclick="$('#rightpanel').toggle();$(this).html($('#rightpanel').is(':visible')?'>':'<');">></div>
         </div>
 		<div id="rightpanel" style="flex: 1 1 40%;box-sizing:border-box;border:1px solid darkred;margin-left:0.2em;display:flex;flex-direction:column;">
@@ -504,6 +524,12 @@ loadstorage();
 <style>
 .targetnode{
 	display:flex;
+    flex-wrap:wrap;
+    border:1px solid blue;
+    box-sizing:border-box;
+    margin:0.2em;
+    padding:0.2em;
+    align-items:flex-start;
 }
 .targetnode.not_containskeyword{
 	display:none !important;
