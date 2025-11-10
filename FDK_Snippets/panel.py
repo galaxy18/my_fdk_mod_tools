@@ -38,25 +38,6 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
                     config=json.load(file)
                     context.scene["copy_bone_config"]=config
                 
-                if not "arr_copy" in context.scene["copy_bone_config"]:
-                    context.scene["copy_bone_config"]["arr_copy"]=[]
-                if not "arr_copy_ignore" in context.scene["copy_bone_config"]:
-                    context.scene["copy_bone_config"]["arr_copy_ignore"]=[]
-                    
-                if not "arr_add" in context.scene["copy_bone_config"]:
-                    context.scene["copy_bone_config"]["arr_add"]=[]
-                if not "arr_add_ignore" in context.scene["copy_bone_config"]:
-                    context.scene["copy_bone_config"]["arr_add_ignore"]=[]
-                if not "arr_addPoint" in context.scene["copy_bone_config"]:
-                    context.scene["copy_bone_config"]["arr_addPoint"]=numpy.array([[]])
-                    
-                if not "arr_base" in context.scene["copy_bone_config"]:
-                    context.scene["copy_bone_config"]["arr_base"]=[]
-                if not "arr_names" in context.scene["copy_bone_config"]:
-                    context.scene["copy_bone_config"]["arr_names"]=[]
-                if not "arr_ignore" in context.scene["copy_bone_config"]:
-                    context.scene["copy_bone_config"]["arr_ignore"]=[]
-                
                 self.report({'INFO'}, f"JSON文件已导入({encoding}): {json_file}")
                 return {'FINISHED'}
             except UnicodeDecodeError:
@@ -105,8 +86,8 @@ class O_RenameBone(bpy.types.Operator):
             self.report({'ERROR'}, "没有选择配置文件") 
             return {'FINISHED'}
         else:
-            arr_copy=context.scene["copy_bone_config"]["arr_copy"]
-            arr_copy_ignore=context.scene["copy_bone_config"]["arr_copy_ignore"]
+            arr_copy=context.scene["copy_bone_config"]["RenameBone_arr_copy"]["data"]
+            arr_copy_ignore=context.scene["copy_bone_config"]["RenameBone_arr_copy_ignore"]["data"]
             
         try:
             if not context.scene.fdk_target_armature and bpy.context.active_object:
@@ -161,7 +142,7 @@ class O_AddEmpty(bpy.types.Operator):
             self.report({'ERROR'}, "没有选择配置文件") 
             return {'FINISHED'}
         else:
-            arr_addPoint=context.scene["copy_bone_config"]["arr_addPoint"]
+            arr_addPoint=context.scene["copy_bone_config"]["AddEmpty_arr_addPoint"]["data"]
         try:
             if not context.scene.fdk_target_armature and bpy.context.active_object:
                 context.scene.fdk_target_armature = bpy.context.active_object
@@ -207,7 +188,7 @@ class O_CopyBone(bpy.types.Operator):
     bl_description = "复制位置"
 
     def create_Bone(_console, _context, arm0, arm, b_orig):
-        arr_add_ignore = context.scene["copy_bone_config"]["arr_add_ignore"]
+        arr_add_ignore = _context.scene["copy_bone_config"]["CopyBone_arr_add_ignore"]["data"]
         if (arm.edit_bones.get(b_orig.name) is None) and (not b_orig.name in arr_add_ignore):
             # _console.report({'INFO'}, '    creating '+b_orig.name)
             b = arm.edit_bones.new(b_orig.name)
@@ -232,7 +213,7 @@ class O_CopyBone(bpy.types.Operator):
             b.parent = arm.edit_bones[b_orig.parent.name]
 
     def processname(_console, _context, arm0, arm, b_child, processchild=True):
-        arr_ignore = _context.scene["copy_bone_config"]["arr_ignore"]
+        arr_ignore = _context.scene["copy_bone_config"]["CopyBone_arr_ignore"]["data"]
         changes=mathutils.Vector((0,0,0))
         try:
             if arm.edit_bones.get(b_child.name) is None:
@@ -266,9 +247,9 @@ class O_CopyBone(bpy.types.Operator):
             self.report({'ERROR'}, "没有选择配置文件") 
             return {'FINISHED'}
         else:
-            arr_base=context.scene["copy_bone_config"]["arr_base"]
-            arr_names=context.scene["copy_bone_config"]["arr_names"]
-            arr_add=context.scene["copy_bone_config"]["arr_add"]
+            arr_base=context.scene["copy_bone_config"]["CopyBone_arr_base"]["data"]
+            arr_names=context.scene["copy_bone_config"]["CopyBone_arr_names"]["data"]
+            arr_add=context.scene["copy_bone_config"]["CopyBone_arr_add"]["data"]
 
         try:
             if not context.scene.fdk_target_armature and bpy.context.active_object:
