@@ -103,7 +103,7 @@ class O_DelBone(bpy.types.Operator):
             self.report({'ERROR'}, "没有headkey") 
             return {'FINISHED'}
         try:
-            if not context.scene.fdk_target_armature and bpy.context.active_object:
+            if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
                 context.scene.fdk_target_armature = bpy.context.active_object
             arm = bpy.data.objects.get(context.scene.fdk_target_armature.name).data
         except:
@@ -145,7 +145,7 @@ class O_RenameBone(bpy.types.Operator):
                 arr_copy=[]
                 arr_copy_ignore=[]
         try:
-            if not context.scene.fdk_target_armature and bpy.context.active_object:
+            if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
                 context.scene.fdk_target_armature = bpy.context.active_object
             arm = bpy.data.objects.get(context.scene.fdk_target_armature.name).data
         except:
@@ -208,7 +208,7 @@ class O_AddEmpty(bpy.types.Operator):
                 needArm=True
         if needArm:
             try:
-                if not context.scene.fdk_target_armature and bpy.context.active_object:
+                if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
                     context.scene.fdk_target_armature = bpy.context.active_object
                 parentobj=bpy.data.objects.get(context.scene.fdk_target_armature.name)
                 arm = parentobj.data
@@ -348,12 +348,12 @@ class O_CopyBone(bpy.types.Operator):
                 self.report({'INFO'}, "无效的配置JSON；CopyBone_arr_add。将忽略此配置")
                 arr_add=[]
         try:
-            if not context.scene.fdk_target_armature and bpy.context.active_object:
+            if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
                 context.scene.fdk_target_armature = bpy.context.active_object
-            if not context.scene.fdk_source_armature and bpy.context.selected_objects:
-                for (idx, obj) in enumerate(bpy.context.selected_objects):
-                    if not obj.name == bpy.context.active_object.name and obj.type == "ARMATURE":
-                        context.scene.fdk_source_armature=bpy.context.selected_objects[idx]
+                if not context.scene.fdk_source_armature and bpy.context.selected_objects:
+                    for (idx, obj) in enumerate(bpy.context.selected_objects):
+                        if not obj.name == bpy.context.active_object.name and obj.type == "ARMATURE":
+                            context.scene.fdk_source_armature=bpy.context.selected_objects[idx]
             arm0 = bpy.data.objects.get(context.scene.fdk_source_armature.name).data
             arm = bpy.data.objects.get(context.scene.fdk_target_armature.name).data
         except:
@@ -385,10 +385,11 @@ class O_AssignArmature(bpy.types.Operator):
     bl_description = "需要先选源骨架，再Ctrl选目标骨架"
     def execute(self, context):
         try:
-            context.scene.fdk_target_armature = bpy.context.active_object
-            for (idx, obj) in enumerate(bpy.context.selected_objects):
-                if not obj.name == bpy.context.active_object.name and obj.type == "ARMATURE":
-                    context.scene.fdk_source_armature=bpy.context.selected_objects[idx]
+            if bpy.context.active_object.type == "ARMATURE":
+                context.scene.fdk_target_armature = bpy.context.active_object
+                for (idx, obj) in enumerate(bpy.context.selected_objects):
+                    if not obj.name == bpy.context.active_object.name and obj.type == "ARMATURE":
+                        context.scene.fdk_source_armature=bpy.context.selected_objects[idx]
         except:
             return {'FINISHED'}
         return {'FINISHED'}
@@ -404,7 +405,7 @@ class O_RenameByJSON(bpy.types.Operator):
             return {'FINISHED'}
         rename_pair=json.loads(context.scene["fdk_rename_pair_json_data"])
         try:
-            if not context.scene.fdk_target_armature and bpy.context.active_object:
+            if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
                 context.scene.fdk_target_armature = bpy.context.active_object
             arm = bpy.data.objects.get(context.scene.fdk_target_armature.name).data
         except:
