@@ -172,7 +172,7 @@ class O_RenameBone(bpy.types.Operator):
 
     def execute(self, context):
         headkey=context.scene.fdk_modify_headname
-        self.report({'DEBUG'}, f"O_RenameBone：父级：{headkey}")
+        self.report({'INFO'}, f"O_RenameBone：父级：{headkey}")
         if not "fdk_config_json_data" in context.scene:
             self.report({'ERROR'}, "没有选择配置文件") 
             return {'FINISHED'}
@@ -202,19 +202,22 @@ class O_RenameBone(bpy.types.Operator):
         for bonename in arr_copy:
             bpy.ops.armature.select_all(action='DESELECT')
             try:
-                self.report({'INFO'}, "copying "+bonename)
-                arm.edit_bones.active = arm.edit_bones[bonename]
-                self.report({'INFO'}, bpy.context.selected_editable_bones[0].name)
-                b = bpy.context.selected_editable_bones[0]
-                cb = arm.edit_bones.new(bonename+"_Copy")
-                cb.head = b.head
-                cb.tail = b.tail
-                cb.matrix = b.matrix
-                cb.parent = b.parent
-                newbones.append(cb)
-                if headkey=="":
-                    arm.edit_bones[bonename].name=bonename+"_Orig"
-            except Exception as e: _console.report({'INFO'}, e)
+                if arm.edit_bones.get(bonename) is None:
+                    self.report({'INFO'}, f"Bone {bonename} not found in current armature;skipped")
+                else:
+                    self.report({'INFO'}, "copying "+bonename)
+                    arm.edit_bones.active = arm.edit_bones[bonename]
+                    self.report({'INFO'}, bpy.context.selected_editable_bones[0].name)
+                    b = bpy.context.selected_editable_bones[0]
+                    cb = arm.edit_bones.new(bonename+"_Copy")
+                    cb.head = b.head
+                    cb.tail = b.tail
+                    cb.matrix = b.matrix
+                    cb.parent = b.parent
+                    newbones.append(cb)
+                    if headkey=="":
+                        arm.edit_bones[bonename].name=bonename+"_Orig"
+            except Exception as e: self.report({'INFO'}, e)
         if not headkey=="":
             bpy.ops.object.mode_set(mode='OBJECT')
             bpy.ops.object.select_all(action='DESELECT')

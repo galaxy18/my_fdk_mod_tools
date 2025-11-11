@@ -3,10 +3,11 @@
     "CopyBone_arr_base": {
         "desc": "复制位置-用于复制骨骼定位，遍历所有子元素",
         "data": [
-            "LeftShoulder",
-            "RightShoulder"
+            "Head"
         ],
         "comments": [
+            "LeftShoulder",
+            "RightShoulder",
             "Spine1",
             "Head"
         ]
@@ -93,14 +94,14 @@
             "Left_Eye",
             "Right_Eye",
             "Left_eye",
-            "Right_eye"
-        ],
-        "comments": [
-            "Face_Root",
+            "Right_eye",
             "R_highlight",
             "R_Highlight",
             "L_highlight",
             "L_Highlight"
+        ],
+        "comments": [
+            "Face_Root"
         ]
     },
     "RenameBone_arr_copy_ignore": {
