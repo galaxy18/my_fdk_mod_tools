@@ -92,6 +92,42 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
         self.report({'ERROR'}, "无法解码JSON文件，请尝试转换为UTF-8编码")
         return {'CANCELLED'}
 ########################## Divider ##########################
+class O_DelOtherBone(bpy.types.Operator):
+    bl_idname = "fdktools.remove_other_bones"
+    bl_label = "删除其他骨骼"
+    bl_description = "根据所输入父级骨骼名字删除其以外的骨骼"
+    
+    def execute(self, context):
+        headkey=context.scene.fdk_modify_headname
+        if headkey is None or headkey == "":
+            self.report({'ERROR'}, "没有headkey") 
+            return {'FINISHED'}
+        try:
+            if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
+                context.scene.fdk_target_armature = bpy.context.active_object
+            arm = bpy.data.objects.get(context.scene.fdk_target_armature.name).data
+        except:
+            self.report({'ERROR'}, "没有选择对象骨架") 
+            return {'FINISHED'}
+            
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.data.objects.get(context.scene.fdk_target_armature.name).select_set(True)
+        bpy.context.view_layer.objects.active=bpy.data.objects.get(context.scene.fdk_target_armature.name)
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.armature.select_all(action='DESELECT')
+        if arm.edit_bones.get(headkey) is not None:
+            arm.edit_bones.active = arm.edit_bones[headkey]
+            bpy.ops.armature.select_similar(type='CHILDREN')
+            bpy.ops.armature.select_all(action='INVERT')
+            bpy.ops.armature.delete()
+            bpy.ops.object.mode_set(mode='OBJECT')
+        else:
+            self.report({'INFO'}, f"所选骨架中不存在{headkey}")
+            return {'FINISHED'}
+        self.report({'INFO'},f"O_DelOtherBone finished")
+        return {'FINISHED'}
+    
 class O_DelBone(bpy.types.Operator):
     bl_idname = "fdktools.remove_head_bones"
     bl_label = "删除所有子骨骼"
@@ -109,6 +145,11 @@ class O_DelBone(bpy.types.Operator):
         except:
             self.report({'ERROR'}, "没有选择对象骨架") 
             return {'FINISHED'}
+            
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.data.objects.get(context.scene.fdk_target_armature.name).select_set(True)
+        bpy.context.view_layer.objects.active=bpy.data.objects.get(context.scene.fdk_target_armature.name)
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.armature.select_all(action='DESELECT')
         if arm.edit_bones.get(headkey) is not None:
@@ -152,6 +193,10 @@ class O_RenameBone(bpy.types.Operator):
             self.report({'ERROR'}, "没有选择对象骨架") 
             return {'FINISHED'}
             
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.data.objects.get(context.scene.fdk_target_armature.name).select_set(True)
+        bpy.context.view_layer.objects.active=bpy.data.objects.get(context.scene.fdk_target_armature.name)
         bpy.ops.object.mode_set(mode='EDIT')
         newbones=[]
         for bonename in arr_copy:
@@ -171,6 +216,10 @@ class O_RenameBone(bpy.types.Operator):
                     arm.edit_bones[bonename].name=bonename+"_Orig"
             except Exception as e: _console.report({'INFO'}, e)
         if not headkey=="":
+            bpy.ops.object.mode_set(mode='OBJECT')
+            bpy.ops.object.select_all(action='DESELECT')
+            bpy.data.objects.get(context.scene.fdk_target_armature.name).select_set(True)
+            bpy.context.view_layer.objects.active=bpy.data.objects.get(context.scene.fdk_target_armature.name)
             bpy.ops.object.mode_set(mode='EDIT')
             bpy.ops.armature.select_all(action='DESELECT')
             arm.edit_bones.active = arm.edit_bones[headkey]
@@ -272,7 +321,13 @@ class O_CopyBone(bpy.types.Operator):
             if arm.edit_bones.get(b_orig.parent.name) is None:
                 O_CopyBone.create_Parent(arm0, arm, b_orig.parent)
             b.parent = arm.edit_bones[b_orig.parent.name]
+        # _console.report({'INFO'}, '    processing children of'+b_orig.name)
+        for obj in bpy.data.objects:
+            if obj.parent_type=='BONE' and obj.parent_bone == b_orig.name and obj.type == "EMPTY":
+                obj.rotation_quaternion = Quaternion([1,0,0,0])
+                obj.scale = [1.0,1.0,1.0]
         for child in b_orig.children:
+            # _console.report({'INFO'}, '    child:'+child.name)
             O_CopyBone.create_Bone(_console, _context, arm0, arm, child)
 
     def create_Parent(arm0, arm, b_orig):
@@ -310,11 +365,11 @@ class O_CopyBone(bpy.types.Operator):
                 #b.parent = b_child.parent
             for obj in bpy.data.objects:
                 if obj.parent_type=='BONE' and obj.parent_bone == b_child.name and obj.type == "EMPTY":
-                    _console.report({'INFO'}, "    Moving EMPTY obj: " + obj.name+" "+changes)
+                    _console.report({'INFO'}, f"    Moving EMPTY obj: {obj.name} {changes}")
                     obj.rotation_quaternion = Quaternion([1,0,0,0])
                     obj.scale = [1.0,1.0,1.0]
                     obj.location += changes
-        except Exception as e: _console.report({'INFO'}, e)
+        except Exception as e: _console.report({'INFO'}, f"{e}")
         if processchild:
             for child in b_child.children:
                 O_CopyBone.processname(_console, _context, arm0, arm, child)
@@ -325,11 +380,11 @@ class O_CopyBone(bpy.types.Operator):
             return {'FINISHED'}
         else:
             try:
-                arr_add_ignore = json.loads(_context.scene["fdk_config_json_data"])["CopyBone_arr_add_ignore"]["data"]
+                arr_add_ignore = json.loads(context.scene["fdk_config_json_data"])["CopyBone_arr_add_ignore"]["data"]
             except:
                 self.report({'INFO'}, "无效的配置JSON；CopyBone_arr_add_ignore。将忽略此配置")
             try:
-                arr_ignore = json.loads(_context.scene["fdk_config_json_data"])["CopyBone_arr_ignore"]["data"]
+                arr_ignore = json.loads(context.scene["fdk_config_json_data"])["CopyBone_arr_ignore"]["data"]
             except:
                 self.report({'INFO'}, "无效的配置JSON；CopyBone_arr_ignore。将忽略此配置")
             try:
@@ -359,21 +414,33 @@ class O_CopyBone(bpy.types.Operator):
         except:
             self.report({'ERROR'}, "没有选择对象骨架") 
             return {'FINISHED'}
-                
+
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.data.objects.get(context.scene.fdk_source_armature.name).select_set(True)
+        bpy.data.objects.get(context.scene.fdk_target_armature.name).select_set(True)
+        bpy.context.view_layer.objects.active=bpy.data.objects.get(context.scene.fdk_target_armature.name)
         bpy.ops.object.mode_set(mode='EDIT')
         for basename in arr_base:
-            self.report({'INFO'}, "Process arr_base:"+basename)
-            O_CopyBone.processname(self, context, arm0, arm, arm0.edit_bones[basename])
+            if basename in arm0.edit_bones:
+                self.report({'INFO'}, "Process arr_base:"+basename)
+                O_CopyBone.processname(self, context, arm0, arm, arm0.edit_bones[basename])
+            else:
+                self.report({'INFO'}, "arr_base:"+basename+" not exist in source armature")
             
         for basename in arr_names:
-            self.report({'INFO'}, "Process arr_names:"+basename)
-            O_CopyBone.processname(self, context, arm0, arm, arm0.edit_bones[basename],False)
+            if basename in arm0.edit_bones:
+                self.report({'INFO'}, "Process arr_names:"+basename)
+                O_CopyBone.processname(self, context, arm0, arm, arm0.edit_bones[basename],False)
+            else:
+                self.report({'INFO'}, "arr_names:"+basename+" not exist in source armature")
             
         for basename in arr_add:
-            self.report({'INFO'}, "Process arr_add:"+basename)
-            b0 = arm0.edit_bones.get(basename)
-            if b0 is not None:
-                O_CopyBone.create_Bone(self, context, arm0, arm, b0)
+            if basename in arm0.edit_bones:
+                self.report({'INFO'}, "Process arr_add:"+basename)
+                O_CopyBone.create_Bone(self, context, arm0, arm, arm0.edit_bones.get(basename))
+            else:
+                self.report({'INFO'}, "arr_add:"+basename+" not exist in source armature")
                 
         bpy.ops.object.mode_set(mode='OBJECT')
         self.report({'INFO'},f"O_CopyBone finished")
@@ -460,7 +527,7 @@ class O_showEmpty(bpy.types.Operator):
         
 class O_delEmpty(bpy.types.Operator):
     bl_idname = "fdktools.remove_empty_object"
-    bl_label = "清理导入，移除空物体（慎用！）"
+    bl_label = "移除空物体（慎用！）"
     bl_description = "移除空物体（慎用！）"
     
     def execute(self, context):
@@ -468,10 +535,31 @@ class O_delEmpty(bpy.types.Operator):
         bpy.ops.object.select_all(action='DESELECT')
         for obj in bpy.data.objects:
             if obj.type == "EMPTY":
+                obj.hide_set(False)
                 obj.select_set(True)
         
         bpy.ops.object.delete()
         self.report({'INFO'},f"O_delEmpty finished")
+        return {'FINISHED'}
+        
+class O_resetEmptyRot(bpy.types.Operator):
+    bl_idname = "fdktools.reset_empty_object"
+    bl_label = "重设空物体旋转"
+    bl_description = "重设空物体旋转"
+    
+    def execute(self, context):
+        if bpy.context.active_object:
+            if bpy.context.active_object.type == "EMPTY":
+                emptyobj=bpy.data.objects[bpy.context.active_object.name]
+                emptyobj.rotation_mode = "QUATERNION"
+                #emptyobj.rotation_quaternion = Quaternion([math.sin(math.pi/4),-math.sin(math.pi/4),0,0])
+                emptyobj.rotation_quaternion = Quaternion([1,0,0,0])
+                emptyobj.scale = [1.0,1.0,1.0]
+                self.report({'INFO'},f"O_resetEmptyRot finished")
+            else:
+                self.report({'INFO'},f"物体类型不为EMPTY")
+        else:
+            self.report({'INFO'},f"请切换编辑模式并令物体可见")
         return {'FINISHED'}
         
 class O_del_glTF_not(bpy.types.Operator):
@@ -484,6 +572,10 @@ class O_del_glTF_not(bpy.types.Operator):
         bpy.ops.object.select_all(action='DESELECT')
         collection = bpy.data.collections.get('glTF_not_exported')
         bpy.data.collections.remove(collection)
+        for obj in bpy.data.objects:
+            if obj.type == "ARMATURE":
+                for bone in obj.pose.bones:
+                    bone.custom_shape = None
         self.report({'INFO'},f"O_del_glTF_not finished")
         return {'FINISHED'}
 ########################## Divider ##########################
@@ -524,6 +616,8 @@ class O_join_Meshes(bpy.types.Operator):
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.delete(type='FACE')
         bpy.ops.object.mode_set(mode='OBJECT')
+        context.scene.fdk_source_mesh=None
+        context.scene.fdk_target_mesh=None
         self.report({'INFO'},f"O_join_Meshes finished")
         return {'FINISHED'}
 ########################## Divider ##########################
@@ -578,7 +672,9 @@ class P_FDK_Snippets_Target(bpy.types.Panel):
             col = box.column(align=True)
             col.label(text="指定父级骨骼")
             col.prop(context.scene, 'fdk_modify_headname')
-            col.operator(O_DelBone.bl_idname, text=O_DelBone.bl_label, icon="BONE_DATA")#删除子级
+            row = col.row(align=True)
+            row.operator(O_DelBone.bl_idname, text=O_DelBone.bl_label, icon="BONE_DATA")#删除子级
+            row.operator(O_DelOtherBone.bl_idname, text=O_DelOtherBone.bl_label, icon="BONE_DATA")#删除其他
             
             box = layout.box()
             col = box.column(align=True)
@@ -614,9 +710,12 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
         box = layout.box()
         col = box.column(align=True)
         col.operator(O_del_glTF_not.bl_idname, text=O_del_glTF_not.bl_label, icon="EMPTY_DATA")
-        col.operator(O_hideEmpty.bl_idname, text=O_hideEmpty.bl_label, icon="EMPTY_DATA")
-        col.operator(O_showEmpty.bl_idname, text=O_showEmpty.bl_label, icon="EMPTY_DATA")
-        col.operator(O_delEmpty.bl_idname, text=O_delEmpty.bl_label, icon="EMPTY_DATA")
+        row = col.row(align=True)
+        row.operator(O_hideEmpty.bl_idname, text=O_hideEmpty.bl_label, icon="EMPTY_DATA")
+        row.operator(O_showEmpty.bl_idname, text=O_showEmpty.bl_label, icon="EMPTY_DATA")
+        row = col.row(align=True)
+        row.operator(O_delEmpty.bl_idname, text=O_delEmpty.bl_label, icon="EMPTY_DATA")
+        row.operator(O_resetEmptyRot.bl_idname, text=O_resetEmptyRot.bl_label, icon="EMPTY_DATA")
         box = layout.box()
         col = box.column(align=True)
         col.prop(context.scene, "fdk_source_mesh", text="源网格", icon="MESH_DATA")
@@ -628,6 +727,7 @@ def register():
     bpy.utils.register_class(O_ImportJSON)
     bpy.utils.register_class(O_ImportRenameJSON)
     bpy.utils.register_class(O_DelBone)
+    bpy.utils.register_class(O_DelOtherBone)
     bpy.utils.register_class(O_RenameBone)
     bpy.utils.register_class(O_CopyBone)
     bpy.utils.register_class(O_AddEmpty)
@@ -636,6 +736,7 @@ def register():
     bpy.utils.register_class(O_hideEmpty)
     bpy.utils.register_class(O_showEmpty)
     bpy.utils.register_class(O_delEmpty)
+    bpy.utils.register_class(O_resetEmptyRot)
     bpy.utils.register_class(O_del_glTF_not)
     bpy.utils.register_class(O_join_Meshes)
     
@@ -670,6 +771,7 @@ def unregister():
     bpy.utils.unregister_class(O_ImportJSON)
     bpy.utils.unregister_class(O_ImportRenameJSON)
     bpy.utils.unregister_class(O_DelBone)
+    bpy.utils.unregister_class(O_DelOtherBone)
     bpy.utils.unregister_class(O_RenameBone)
     bpy.utils.unregister_class(O_CopyBone)
     bpy.utils.unregister_class(O_AddEmpty)
@@ -678,6 +780,7 @@ def unregister():
     bpy.utils.unregister_class(O_hideEmpty)
     bpy.utils.unregister_class(O_showEmpty)
     bpy.utils.unregister_class(O_delEmpty)
+    bpy.utils.unregister_class(O_resetEmptyRot)
     bpy.utils.unregister_class(O_del_glTF_not)
     bpy.utils.unregister_class(O_join_Meshes)
     

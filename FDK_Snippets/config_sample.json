@@ -27,7 +27,7 @@
     },
     "CopyBone_arr_add": {
         "desc": "复制位置-用于提供父骨骼添加缺失子骨骼",
-        "data": [],
+        "data": ["Head"],
         "comments": [
             "Bone_hair_tail1",
             "Bone_Rcloth_front1",
