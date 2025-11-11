@@ -1,6 +1,6 @@
 bl_info = {
     "name": "FDK Snippets",
-    "author": "作者",
+    "author": "",
     "version": (1, 0),
     "blender": (4, 2, 3),
     "location": "View3D > Tool Shelf >FDK_Snippets Panel",
