@@ -95,25 +95,14 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
 class O_DelOtherBone(bpy.types.Operator):
     bl_idname = "fdktools.remove_other_bones"
     bl_label = "删除其他骨骼"
-    bl_description = "根据所输入父级骨骼名字删除其以外的骨骼"
+    bl_description = "根据所输入父级骨骼名字删除目标骨架中的其以外的骨骼"
     
     def execute(self, context):
         headkey=context.scene.fdk_modify_headname
         if headkey is None or headkey == "":
             self.report({'ERROR'}, "没有headkey") 
             return {'FINISHED'}
-        try:
-            if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
-                context.scene.fdk_target_armature = bpy.context.active_object
-            arm = bpy.data.objects.get(context.scene.fdk_target_armature.name).data
-        except:
-            self.report({'ERROR'}, "没有选择对象骨架") 
-            return {'FINISHED'}
-            
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bpy.ops.object.select_all(action='DESELECT')
-        bpy.data.objects.get(context.scene.fdk_target_armature.name).select_set(True)
-        bpy.context.view_layer.objects.active=bpy.data.objects.get(context.scene.fdk_target_armature.name)
+        arm = bpy.data.objects.get(bpy.context.active_object.name).data
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.armature.select_all(action='DESELECT')
         if arm.edit_bones.get(headkey) is not None:
@@ -131,25 +120,14 @@ class O_DelOtherBone(bpy.types.Operator):
 class O_DelBone(bpy.types.Operator):
     bl_idname = "fdktools.remove_head_bones"
     bl_label = "删除所有子骨骼"
-    bl_description = "根据所输入父级骨骼名字删除其所有子骨骼"
+    bl_description = "根据所输入父级骨骼名字删除目标骨架中的其所有子骨骼"
 
     def execute(self, context):
         headkey=context.scene.fdk_modify_headname
         if headkey is None or headkey == "":
             self.report({'ERROR'}, "没有headkey") 
             return {'FINISHED'}
-        try:
-            if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
-                context.scene.fdk_target_armature = bpy.context.active_object
-            arm = bpy.data.objects.get(context.scene.fdk_target_armature.name).data
-        except:
-            self.report({'ERROR'}, "没有选择对象骨架") 
-            return {'FINISHED'}
-            
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bpy.ops.object.select_all(action='DESELECT')
-        bpy.data.objects.get(context.scene.fdk_target_armature.name).select_set(True)
-        bpy.context.view_layer.objects.active=bpy.data.objects.get(context.scene.fdk_target_armature.name)
+        arm = bpy.data.objects.get(bpy.context.active_object.name).data
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.armature.select_all(action='DESELECT')
         if arm.edit_bones.get(headkey) is not None:
@@ -168,7 +146,7 @@ class O_RenameBone(bpy.types.Operator):
     #TODO: config prefix
     bl_idname = "fdktools.rename_head_bones"
     bl_label = "重命名脸部顶点组"
-    bl_description = "根据所输入父级骨骼名字重命名子级，根据JSON配置复制一份原名骨骼以应对定位"
+    bl_description = "根据所输入父级骨骼名字重命名目标骨架中的子级，根据JSON配置复制一份原名骨骼以应对定位"
 
     def execute(self, context):
         headkey=context.scene.fdk_modify_headname
@@ -185,18 +163,7 @@ class O_RenameBone(bpy.types.Operator):
                 "请检查RenameBone_arr_copy和RenameBone_arr_copy_ignore。将不会复制定位骨骼")
                 arr_copy=[]
                 arr_copy_ignore=[]
-        try:
-            if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
-                context.scene.fdk_target_armature = bpy.context.active_object
-            arm = bpy.data.objects.get(context.scene.fdk_target_armature.name).data
-        except:
-            self.report({'ERROR'}, "没有选择对象骨架") 
-            return {'FINISHED'}
-            
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bpy.ops.object.select_all(action='DESELECT')
-        bpy.data.objects.get(context.scene.fdk_target_armature.name).select_set(True)
-        bpy.context.view_layer.objects.active=bpy.data.objects.get(context.scene.fdk_target_armature.name)
+        arm = bpy.data.objects.get(bpy.context.active_object.name).data
         bpy.ops.object.mode_set(mode='EDIT')
         newbones=[]
         for bonename in arr_copy:
@@ -218,11 +185,8 @@ class O_RenameBone(bpy.types.Operator):
                     if headkey=="":
                         arm.edit_bones[bonename].name=bonename+"_Orig"
             except Exception as e: self.report({'INFO'}, e)
+            
         if not headkey=="":
-            bpy.ops.object.mode_set(mode='OBJECT')
-            bpy.ops.object.select_all(action='DESELECT')
-            bpy.data.objects.get(context.scene.fdk_target_armature.name).select_set(True)
-            bpy.context.view_layer.objects.active=bpy.data.objects.get(context.scene.fdk_target_armature.name)
             bpy.ops.object.mode_set(mode='EDIT')
             bpy.ops.armature.select_all(action='DESELECT')
             arm.edit_bones.active = arm.edit_bones[headkey]
@@ -232,6 +196,7 @@ class O_RenameBone(bpy.types.Operator):
                 or obj.name.endswith("_New") or obj.name.endswith("_Orig")):
                     oldname = obj.name
                     obj.name = oldname+"_New"
+                    
         for obj in newbones:
             obj.name = obj.name.replace("_Copy", "")
 
@@ -254,20 +219,15 @@ class O_AddEmpty(bpy.types.Operator):
             except:
                 self.report({'ERROR'}, "无效的配置JSON；请检查AddEmpty_arr_addPoint。")
                 return {'FINISHED'}
+                
         needArm=False
         for obj in arr_addPoint:
             if obj[1]=="" and obj[2]=="BONE":
                 needArm=True
         if needArm:
-            try:
-                if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
-                    context.scene.fdk_target_armature = bpy.context.active_object
-                parentobj=bpy.data.objects.get(context.scene.fdk_target_armature.name)
-                arm = parentobj.data
-            except:
-                self.report({'ERROR'}, "没有选择目标骨架") 
-                return {'FINISHED'}
-        
+            parentobj = bpy.data.objects.get(bpy.context.active_object.name)
+            arm = parentobj.data
+            
         for obj in arr_addPoint:
             if not obj[0] in bpy.data.objects:
                 bpy.ops.object.mode_set(mode="OBJECT")
@@ -308,7 +268,7 @@ class O_AddEmpty(bpy.types.Operator):
 class O_CopyBone(bpy.types.Operator):
     bl_idname = "fdktools.copy_bone_nodes"
     bl_label = "根据JSON配置复制位置"
-    bl_description = "根据JSON配置复制位置"
+    bl_description = "根据JSON配置复制源骨架的位置到目标骨架"
 
     def create_Bone(_console, _context, arm0, arm, b_orig):
         try:
@@ -405,24 +365,16 @@ class O_CopyBone(bpy.types.Operator):
             except:
                 self.report({'INFO'}, "无效的配置JSON；CopyBone_arr_add。将忽略此配置")
                 arr_add=[]
-        try:
-            if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
-                context.scene.fdk_target_armature = bpy.context.active_object
-                if not context.scene.fdk_source_armature and bpy.context.selected_objects:
-                    for (idx, obj) in enumerate(bpy.context.selected_objects):
-                        if not obj.name == bpy.context.active_object.name and obj.type == "ARMATURE":
-                            context.scene.fdk_source_armature=bpy.context.selected_objects[idx]
-            arm0 = bpy.data.objects.get(context.scene.fdk_source_armature.name).data
-            arm = bpy.data.objects.get(context.scene.fdk_target_armature.name).data
-        except:
-            self.report({'ERROR'}, "没有选择对象骨架") 
+                
+        arm = bpy.data.objects.get(bpy.context.active_object.name).data
+        arm0=None
+        for obj in bpy.context.selected_objects:
+            if obj.type=="ARMATURE" and obj.name != bpy.context.active_object.name:
+                arm0=obj.data
+        if arm0 is None:
+            self.report({'ERROR'}, "没有选择对象骨架")
             return {'FINISHED'}
 
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bpy.ops.object.select_all(action='DESELECT')
-        bpy.data.objects.get(context.scene.fdk_source_armature.name).select_set(True)
-        bpy.data.objects.get(context.scene.fdk_target_armature.name).select_set(True)
-        bpy.context.view_layer.objects.active=bpy.data.objects.get(context.scene.fdk_target_armature.name)
         bpy.ops.object.mode_set(mode='EDIT')
         for basename in arr_base:
             if basename in arm0.edit_bones:
@@ -466,22 +418,15 @@ class O_AssignArmature(bpy.types.Operator):
 ########################## Divider ##########################
 class O_RenameByJSON(bpy.types.Operator):
     bl_idname = "fdktools.rename_by_json"
-    bl_label = "根据JSON重命名骨骼"
-    bl_description = "根据JSON重命名骨骼"
+    bl_label = "根据JSON重命名"
+    bl_description = "根据JSON重命名目标骨架中的骨骼"
     
     def execute(self, context):
         if not "fdk_rename_pair_json_data" in context.scene or context.scene["fdk_rename_pair_json_data"] == "":
             self.report({'ERROR'}, "没有选择配置文件") 
             return {'FINISHED'}
         rename_pair=json.loads(context.scene["fdk_rename_pair_json_data"])
-        try:
-            if not context.scene.fdk_target_armature and bpy.context.active_object and bpy.context.active_object.type == "ARMATURE":
-                context.scene.fdk_target_armature = bpy.context.active_object
-            arm = bpy.data.objects.get(context.scene.fdk_target_armature.name).data
-        except:
-            self.report({'ERROR'}, "没有选择对象骨架") 
-            return {'FINISHED'}
-        
+        arm=bpy.data.objects.get(bpy.context.active_object.name).data
         idx=0
         names=[]
         for key in rename_pair:
@@ -506,7 +451,7 @@ class O_hideEmpty(bpy.types.Operator):
     bl_description = "隐藏空物体"
     
     def execute(self, context):
-        bpy.ops.object.mode_set(mode='OBJECT')
+        # bpy.ops.object.mode_set(mode='OBJECT')
         for obj in bpy.data.objects:
             if obj.type == "EMPTY":
                 obj.hide_set(True)
@@ -520,7 +465,7 @@ class O_showEmpty(bpy.types.Operator):
     bl_description = "取消隐藏空物体"
     
     def execute(self, context):
-        bpy.ops.object.mode_set(mode='OBJECT')
+        #bpy.ops.object.mode_set(mode='OBJECT')
         for obj in bpy.data.objects:
             if obj.type == "EMPTY":
                 obj.hide_set(False)
@@ -530,8 +475,8 @@ class O_showEmpty(bpy.types.Operator):
         
 class O_delEmpty(bpy.types.Operator):
     bl_idname = "fdktools.remove_empty_object"
-    bl_label = "移除空物体（慎用！）"
-    bl_description = "移除空物体（慎用！）"
+    bl_label = "⚠移除空物体"
+    bl_description = "移除空物体，会导致丢失配件，如需要保留请勿使用此功能"
     
     def execute(self, context):
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -548,7 +493,7 @@ class O_delEmpty(bpy.types.Operator):
 class O_resetEmptyRot(bpy.types.Operator):
     bl_idname = "fdktools.reset_empty_object"
     bl_label = "重设空物体旋转"
-    bl_description = "重设空物体旋转"
+    bl_description = "重设空物体旋转为默认数值。请确保选取了空物体并可见，否则无效果"
     
     def execute(self, context):
         if bpy.context.active_object:
@@ -584,22 +529,23 @@ class O_del_glTF_not(bpy.types.Operator):
 ########################## Divider ##########################
 class O_join_Meshes(bpy.types.Operator):
     #TODO: 支持忽略顶点组
+# vg = bpy.data.objects.get(bpy.context.active_object.name).vertex_groups
+# vg_idx = vg["Head"].index
+# bpy.ops.object.mode_set(mode='EDIT')
+# bpy.data.objects.get(bpy.context.active_object.name).vertex_groups.active_index = vg_idx
+# bpy.ops.object.vertex_group_deselect()
     bl_idname = "fdktools.join_selected_meshes"
     bl_label = "JOIN & DELETE"
-    bl_description = "先选新的，再选旧的，然后JOIN"
+    bl_description = "先选新的，再选旧的，然后JOIN。只有选择2个网格时才有效果。"
     
     def execute(self, context):
-        try:
-            if not context.scene.fdk_target_mesh and bpy.context.active_object and bpy.context.active_object.type=="MESH":
-                context.scene.fdk_target_mesh = bpy.context.active_object
-            if not context.scene.fdk_source_mesh:
-                for (idx, obj) in enumerate(bpy.context.selected_objects):
-                    if not obj.name == bpy.context.active_object.name and obj.type == "MESH":
-                        context.scene.fdk_source_mesh = bpy.context.selected_objects[idx]
-            mesh0 = bpy.data.objects.get(context.scene.fdk_source_mesh.name)
-            mesh = bpy.data.objects.get(context.scene.fdk_target_mesh.name)
-        except:
-            self.report({'ERROR'}, "没有选择对象网格") 
+        mesh = bpy.data.objects.get(bpy.context.active_object.name)
+        mesh0=None
+        for obj in bpy.context.selected_objects:
+            if obj.type=="MESH" and obj.name != bpy.context.active_object.name:
+                mesh0=obj
+        if mesh0 is None:
+            self.report({'ERROR'}, "没有选择对象网格")
             return {'FINISHED'}
 
         mesh0.select_set(False)
@@ -619,12 +565,55 @@ class O_join_Meshes(bpy.types.Operator):
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.delete(type='FACE')
         bpy.ops.object.mode_set(mode='OBJECT')
-        context.scene.fdk_source_mesh=None
-        context.scene.fdk_target_mesh=None
+        # context.scene.fdk_source_mesh=None
+        # context.scene.fdk_target_mesh=None
         self.report({'INFO'},f"O_join_Meshes finished")
         return {'FINISHED'}
 ########################## Divider ##########################
-#TODO: 导出材质和贴图名
+class O_get_MaterialName(bpy.types.Operator):
+    bl_idname = "fdktools.get_material_images"
+    bl_label = "复制贴图参数"
+    bl_description = "复制所选网格或骨架的材质和贴图名到剪贴板"
+    
+    def execute(self, context):
+        objs=[]
+        bpy.context.window_manager.clipboard=""
+        if bpy.context.active_object.type=="MESH":
+            objs.append(bpy.context.active_object)
+        elif bpy.context.active_object.type=="ARMATURE":
+            for child in bpy.context.active_object.children:
+                if child.type=="MESH":
+                    objs.append(child)
+        else:
+            self.report({'INFO'},f"必须选择骨架或者网格")
+            return {'CANCELLED'}
+        result=[]
+        for obj in objs:
+            # mesh = obj.data
+            for slot in obj.material_slots:
+                mat = slot.material
+                if mat is not None:
+                    result.append(mat.name)
+                    for node in mat.node_tree.nodes:
+                        for slot_base_color in node.inputs:
+                            if slot_base_color.is_linked:
+                                node_base_color = slot_base_color.links[0].from_node
+                                if slot_base_color.name in ["Base Color","Color"]:
+                                    result.append('  '+node_base_color.image.name)
+                                # print('  '+node.type)
+                                # print('  '+slot_base_color.type)
+                                # print('    '+slot_base_color.name)
+                                # try:
+                                    # print('    '+node_base_color.image.name)
+                                    # = os.path.split( node_base_color.image.filepath )[1]
+                                # except:
+                                    # print('')
+
+        delimiter = "\n"
+        # self.report({'INFO'},delimiter.join(result))
+        bpy.context.window_manager.clipboard=delimiter.join(result)
+        self.report({'INFO'},f"O_get_MaterialName finished")
+        return {'FINISHED'}
 ########################## Divider ##########################
 class P_FDK_Snippets(bpy.types.Panel):
     bl_idname = "FDK_Snippets"
@@ -646,16 +635,42 @@ class P_FDK_Snippets(bpy.types.Panel):
             col.operator(O_ImportJSON.bl_idname, icon="IMPORT", text="重选配置JSON")#导入配置JSON
         else:
             col.operator(O_ImportJSON.bl_idname, icon="IMPORT")#导入配置JSON
-        col.operator(O_AssignArmature.bl_idname, text=O_AssignArmature.bl_label, icon="ARMATURE_DATA")
-        col.prop(context.scene, "fdk_target_armature", text="目标骨架", icon="ARMATURE_DATA")
-        if context.scene.fdk_config_json_data:
-            box = layout.box()
-            col = box.column()
-            col.prop(context.scene, "fdk_source_armature", text="源骨架", icon="ARMATURE_DATA")
-            if context.scene.fdk_source_armature:
-                col.operator(O_CopyBone.bl_idname, text=O_CopyBone.bl_label, icon="BONE_DATA")#复制位置
-            else:
-                col.label(text="先选择目标骨架才能复制位置")
+        # col.operator(O_AssignArmature.bl_idname, text=O_AssignArmature.bl_label, icon="ARMATURE_DATA")
+        
+        if bpy.context.active_object and bpy.context.active_object.type=="ARMATURE":
+            row = col.row(align=True)
+            row.label(text="目标骨架：",icon="ARMATURE_DATA")
+            row.label(text=bpy.context.active_object.name)
+            # col.prop(context.scene, "fdk_target_armature", text="目标骨架", icon="ARMATURE_DATA")
+        
+            if len(bpy.context.selected_objects)>0:
+                sel_obj=None
+                for obj in bpy.context.selected_objects:
+                    if obj.type=="ARMATURE" and obj.name != bpy.context.active_object.name:
+                        sel_obj=obj
+                if sel_obj:
+                    row = col.row(align=True)
+                    row.label(text="源骨架：",icon="ARMATURE_DATA")
+                    row.label(text=sel_obj.name)
+                    if context.scene.fdk_config_json_data:
+                        col.operator(O_CopyBone.bl_idname, text=O_CopyBone.bl_label, icon="ARMATURE_DATA")#复制位置
+                    else:
+                        col.label(text="先导入JSON才能复制位置")
+                else:
+                    col.label(text="先选择源骨架才能复制位置")
+        else:
+            col.label(text="先选择骨架才能操作")
+                        
+        # if context.scene.fdk_config_json_data:
+            # col.prop(context.scene, "fdk_source_armature", text="源骨架", icon="ARMATURE_DATA")
+            # if context.scene.fdk_source_armature:
+                # col.operator(O_CopyBone.bl_idname, text=O_CopyBone.bl_label, icon="BONE_DATA")#复制位置
+            # else:
+                # col.label(text="先选择源骨架才能复制位置")
+        # else:
+            # box = layout.box()
+            # col = box.column()
+            # col.label(text="先导入JSON才能复制位置")
 
 class P_FDK_Snippets_Target(bpy.types.Panel):
     bl_idname = "FDK_Snippets_Target"
@@ -671,16 +686,14 @@ class P_FDK_Snippets_Target(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         box = layout.box()
-        if context.scene.fdk_target_armature:
+        if bpy.context.active_object and bpy.context.active_object.type=="ARMATURE":
             col = box.column(align=True)
             col.label(text="指定父级骨骼")
-            col.prop(context.scene, 'fdk_modify_headname')
+            col.prop(context.scene, 'fdk_modify_headname',icon="BONE_DATA")
             row = col.row(align=True)
             row.operator(O_DelBone.bl_idname, text=O_DelBone.bl_label, icon="BONE_DATA")#删除子级
             row.operator(O_DelOtherBone.bl_idname, text=O_DelOtherBone.bl_label, icon="BONE_DATA")#删除其他
             
-            box = layout.box()
-            col = box.column(align=True)
             if context.scene.fdk_config_json_data:
                 col.operator(O_RenameBone.bl_idname, text=O_RenameBone.bl_label, icon="BONE_DATA")#重命名子级
                 col.operator(O_AddEmpty.bl_idname, text=O_AddEmpty.bl_label, icon="EMPTY_DATA")#添加空物体
@@ -696,7 +709,6 @@ class P_FDK_Snippets_Target(bpy.types.Panel):
         else:
             col = box.column(align=True)
             col.label(text="先选择目标骨架才能操作")
-
 
 class P_FDK_Snippets_Others(bpy.types.Panel):
     bl_idname = "FDK_Snippets_Others"
@@ -721,12 +733,34 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
         row.operator(O_resetEmptyRot.bl_idname, text=O_resetEmptyRot.bl_label, icon="EMPTY_DATA")
         box = layout.box()
         col = box.column(align=True)
-        col.prop(context.scene, "fdk_source_mesh", text="源网格", icon="MESH_DATA")
-        col.prop(context.scene, "fdk_target_mesh", text="目标网格", icon="MESH_DATA")
-        col.operator(O_join_Meshes.bl_idname, text=O_join_Meshes.bl_label, icon="MESH_DATA")
+        if bpy.context.active_object and bpy.context.active_object.type=="MESH":
+            row = col.row(align=True)
+            row.label(text="目标网格：")
+            row.label(text=bpy.context.active_object.name)
+            if len(bpy.context.selected_objects)>0:
+                sel_obj=None
+                for obj in bpy.context.selected_objects:
+                    if obj.type=="MESH" and obj.name != bpy.context.active_object.name:
+                        sel_obj=obj
+                if sel_obj:
+                    row = col.row(align=True)
+                    row.label(text="源网格：")
+                    row.label(text=sel_obj.name)
+                    col.operator(O_join_Meshes.bl_idname, text=O_join_Meshes.bl_label, icon="MESH_DATA")
+                else:
+                    col.label(text="选择源网格才能合并")
+        else:
+            col.label(text="先选择网格才能操作")
+        if bpy.context.active_object and (bpy.context.active_object.type=="MESH" or bpy.context.active_object.type=="ARMATURE"):
+            col.operator(O_get_MaterialName.bl_idname, text=O_get_MaterialName.bl_label)
+        else:
+            col.label(text="选择骨架或网格复制贴图到剪贴板",icon="COPYDOWN")
+        # col.prop(context.scene, "fdk_source_mesh", text="源网格", icon="MESH_DATA")
+        # col.prop(context.scene, "fdk_target_mesh", text="目标网格", icon="MESH_DATA")
+        # col.operator(O_join_Meshes.bl_idname, text=O_join_Meshes.bl_label, icon="MESH_DATA")
 ########################## Divider ##########################
 def register():
-    bpy.utils.register_class(O_AssignArmature)
+    # bpy.utils.register_class(O_AssignArmature)
     bpy.utils.register_class(O_ImportJSON)
     bpy.utils.register_class(O_ImportRenameJSON)
     bpy.utils.register_class(O_DelBone)
@@ -742,6 +776,7 @@ def register():
     bpy.utils.register_class(O_resetEmptyRot)
     bpy.utils.register_class(O_del_glTF_not)
     bpy.utils.register_class(O_join_Meshes)
+    bpy.utils.register_class(O_get_MaterialName)
     
     bpy.utils.register_class(P_FDK_Snippets)
     bpy.utils.register_class(P_FDK_Snippets_Target)
@@ -753,24 +788,24 @@ def register():
     bpy.types.Scene.fdk_rename_pair_json_data = bpy.props.StringProperty(
         name="Rename JSON Data",description="重命名配对数据",default=""
     )
-    bpy.types.Scene.fdk_source_armature = bpy.props.PointerProperty(
-        description="选择一个骨架作为数据源",type=bpy.types.Object,poll=ObjType.is_armature
-    )
-    bpy.types.Scene.fdk_target_armature = bpy.props.PointerProperty(
-        description="选择将被作用的骨架",type=bpy.types.Object,poll=ObjType.is_armature
-    )
+    # bpy.types.Scene.fdk_source_armature = bpy.props.PointerProperty(
+        # description="选择一个骨架作为数据源",type=bpy.types.Object,poll=ObjType.is_armature
+    # )
+    # bpy.types.Scene.fdk_target_armature = bpy.props.PointerProperty(
+        # description="选择将被作用的骨架",type=bpy.types.Object,poll=ObjType.is_armature
+    # )
     bpy.types.Scene.fdk_modify_headname = bpy.props.StringProperty(
         name="名字",description="设置父级名字",default= "Head"
     )
-    bpy.types.Scene.fdk_source_mesh = bpy.props.PointerProperty(
-        description="选择一个网格作为数据源",type=bpy.types.Object,poll=ObjType.is_mesh
-    )
-    bpy.types.Scene.fdk_target_mesh = bpy.props.PointerProperty(
-        description="选择将被作用的网格",type=bpy.types.Object,poll=ObjType.is_mesh
-    )
+    # bpy.types.Scene.fdk_source_mesh = bpy.props.PointerProperty(
+        # description="选择一个网格作为数据源",type=bpy.types.Object,poll=ObjType.is_mesh
+    # )
+    # bpy.types.Scene.fdk_target_mesh = bpy.props.PointerProperty(
+        # description="选择将被作用的网格",type=bpy.types.Object,poll=ObjType.is_mesh
+    # )
 
 def unregister():
-    bpy.utils.unregister_class(O_AssignArmature)
+    # bpy.utils.unregister_class(O_AssignArmature)
     bpy.utils.unregister_class(O_ImportJSON)
     bpy.utils.unregister_class(O_ImportRenameJSON)
     bpy.utils.unregister_class(O_DelBone)
@@ -786,6 +821,7 @@ def unregister():
     bpy.utils.unregister_class(O_resetEmptyRot)
     bpy.utils.unregister_class(O_del_glTF_not)
     bpy.utils.unregister_class(O_join_Meshes)
+    bpy.utils.unregister_class(O_get_MaterialName)
     
     bpy.utils.unregister_class(P_FDK_Snippets)
     bpy.utils.unregister_class(P_FDK_Snippets_Target)
@@ -793,9 +829,9 @@ def unregister():
 
     del bpy.types.Scene.fdk_config_json_data
     del bpy.types.Scene.fdk_rename_pair_json_data
-    del bpy.types.Scene.fdk_source_armature
-    del bpy.types.Scene.fdk_target_armature
-    del bpy.types.Scene.fdk_source_mesh
-    del bpy.types.Scene.fdk_target_mesh
+    # del bpy.types.Scene.fdk_source_armature
+    # del bpy.types.Scene.fdk_target_armature
+    # del bpy.types.Scene.fdk_source_mesh
+    # del bpy.types.Scene.fdk_target_mesh
     del bpy.types.Scene.fdk_modify_headname
     
