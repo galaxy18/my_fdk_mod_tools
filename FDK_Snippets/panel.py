@@ -593,24 +593,25 @@ class O_get_MaterialName(bpy.types.Operator):
             for slot in obj.material_slots:
                 mat = slot.material
                 if mat is not None:
-                    result.append(mat.name)
+                    result.append(""+mat.name)
                     for node in mat.node_tree.nodes:
                         for slot_base_color in node.inputs:
-                            if slot_base_color.is_linked:
+                            if slot_base_color.type == "RGBA" and slot_base_color.is_linked:
                                 node_base_color = slot_base_color.links[0].from_node
-                                if slot_base_color.name in ["Base Color","Color"]:
-                                    result.append('  '+node_base_color.image.name)
-                                # print('  '+node.type)
-                                # print('  '+slot_base_color.type)
-                                # print('    '+slot_base_color.name)
-                                # try:
-                                    # print('    '+node_base_color.image.name)
-                                    # = os.path.split( node_base_color.image.filepath )[1]
-                                # except:
-                                    # print('')
+                                if node_base_color.type == "MIX":
+                                    for slot_base_color2 in node_base_color.inputs:
+                                        if slot_base_color2.is_linked:
+                                            node_base_color2 = slot_base_color2.links[0].from_node
+                                            if node_base_color2.type == 'TEX_IMAGE':
+                                                result.append('    '+node_base_color2.image.name)
+                                elif not node_base_color.type == "VERTEX_COLOR":
+                                    try:
+                                        result.append('    '+node_base_color.image.name)
+                                    except:
+                                        self.report({'ERROR'},f"    exception:{node_base_color.type}")
 
         delimiter = "\n"
-        # self.report({'INFO'},delimiter.join(result))
+        self.report({'INFO'},delimiter.join(result))
         bpy.context.window_manager.clipboard=delimiter.join(result)
         self.report({'INFO'},f"O_get_MaterialName finished")
         return {'FINISHED'}
@@ -752,9 +753,9 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
         else:
             col.label(text="先选择网格才能操作")
         if bpy.context.active_object and (bpy.context.active_object.type=="MESH" or bpy.context.active_object.type=="ARMATURE"):
-            col.operator(O_get_MaterialName.bl_idname, text=O_get_MaterialName.bl_label)
+            col.operator(O_get_MaterialName.bl_idname, text=O_get_MaterialName.bl_label,icon="COPYDOWN")
         else:
-            col.label(text="选择骨架或网格复制贴图到剪贴板",icon="COPYDOWN")
+            col.label(text="选择骨架或网格复制贴图到剪贴板")
         # col.prop(context.scene, "fdk_source_mesh", text="源网格", icon="MESH_DATA")
         # col.prop(context.scene, "fdk_target_mesh", text="目标网格", icon="MESH_DATA")
         # col.operator(O_join_Meshes.bl_idname, text=O_join_Meshes.bl_label, icon="MESH_DATA")

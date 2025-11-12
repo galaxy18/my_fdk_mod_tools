@@ -3,7 +3,8 @@
     "CopyBone_arr_base": {
         "desc": "复制位置-用于复制骨骼定位，遍历所有子元素",
         "data": [
-            "Head"
+            "LeftShoulder",
+            "RightShoulder"
         ],
         "comments": [
             "LeftShoulder",
@@ -14,21 +15,25 @@
     },
     "CopyBone_arr_names": {
         "desc": "复制位置-用于复制骨骼定位，但不处理子元素",
-        "data": [],
+        "data": [
+        ],
         "comments": [
             "Head"
         ]
     },
     "CopyBone_arr_ignore": {
         "desc": "复制位置-用于复制骨骼定位，要忽略的名称",
-        "data": [],
+        "data": [
+        ],
         "comments": [
             "Head"
         ]
     },
     "CopyBone_arr_add": {
-        "desc": "复制位置-用于提供父骨骼添加缺失子骨骼",
-        "data": ["Head"],
+        "desc": "复制位置-用于提供父骨骼添加缺失子骨骼，不会处理其位置",
+        "data": [
+            "Head"
+        ],
         "comments": [
             "Bone_hair_tail1",
             "Bone_Rcloth_front1",
