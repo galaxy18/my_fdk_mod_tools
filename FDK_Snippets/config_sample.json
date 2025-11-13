@@ -1,10 +1,33 @@
 {
-    "Headkey":"Head",
+    "Headkey": "Head",
+    "RenameBone_prefix": "_New",
+    "RenameBone_orig_prefix": "_Orig",
+    "RenameBone_arr_copy": {
+        "desc": "重命名脸部-复制一份原名骨骼以应对定位",
+        "data": [
+            "Left_Eye",
+            "Right_Eye",
+            "Left_eye",
+            "Right_eye",
+            "R_highlight",
+            "R_Highlight",
+            "L_highlight",
+            "L_Highlight"
+        ],
+        "comments": [
+            "Face_Root"
+        ]
+    },
+    "RenameBone_arr_copy_ignore": {
+        "desc": "重命名脸部时要忽略的顶点组",
+        "data": [
+            "Head"
+        ],
+        "comments": []
+    },
     "CopyBone_arr_base": {
         "desc": "复制位置-用于复制骨骼定位，遍历所有子元素",
         "data": [
-            "LeftShoulder",
-            "RightShoulder"
         ],
         "comments": [
             "LeftShoulder",
@@ -15,24 +38,22 @@
     },
     "CopyBone_arr_names": {
         "desc": "复制位置-用于复制骨骼定位，但不处理子元素",
-        "data": [
-        ],
+        "data": [],
         "comments": [
-            "Head"
         ]
     },
     "CopyBone_arr_ignore": {
         "desc": "复制位置-用于复制骨骼定位，要忽略的名称",
         "data": [
+            "Head"
         ],
         "comments": [
-            "Head"
+            
         ]
     },
     "CopyBone_arr_add": {
         "desc": "复制位置-用于提供父骨骼添加缺失子骨骼，不会处理其位置",
         "data": [
-            "Head"
         ],
         "comments": [
             "Bone_hair_tail1",
@@ -43,6 +64,8 @@
             "Bone_Rswallow_out1",
             "Bone_Lswallow_out1",
             "Head",
+            "Hips",
+            "Spine2",
             "Bone_Lleg_belt",
             "Bone_Rleg_belt",
             "LeftLeg"
@@ -90,29 +113,6 @@
                 "OBJECT",
                 ""
             ]
-        ],
-        "comments": []
-    },
-    "RenameBone_arr_copy": {
-        "desc": "重命名脸部-复制一份原名骨骼以应对定位",
-        "data": [
-            "Left_Eye",
-            "Right_Eye",
-            "Left_eye",
-            "Right_eye",
-            "R_highlight",
-            "R_Highlight",
-            "L_highlight",
-            "L_Highlight"
-        ],
-        "comments": [
-            "Face_Root"
-        ]
-    },
-    "RenameBone_arr_copy_ignore": {
-        "desc": "重命名脸部时要忽略的顶点组",
-        "data": [
-            "Head"
         ],
         "comments": []
     }

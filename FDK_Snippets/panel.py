@@ -1,4 +1,3 @@
-# type: ignore
 import bpy,os,json
 import mathutils,math,numpy
 from bpy_extras.io_utils import ImportHelper
@@ -534,7 +533,6 @@ class O_del_glTF_not(bpy.types.Operator):
     bl_description = "清理glTF_not_exported"
     
     def execute(self, context):
-        bpy.ops.object.mode_set(mode='OBJECT')
         bpy.ops.object.select_all(action='DESELECT')
         collection = bpy.data.collections.get('glTF_not_exported')
         bpy.data.collections.remove(collection)
@@ -656,29 +654,35 @@ class P_FDK_Snippets(bpy.types.Panel):
             col.operator(O_ImportJSON.bl_idname, icon="IMPORT")#导入配置JSON
         # col.operator(O_AssignArmature.bl_idname, text=O_AssignArmature.bl_label, icon="ARMATURE_DATA")
         
+        # col.prop(context.scene, "fdk_target_armature", text="目标骨架", icon="ARMATURE_DATA")
+        row = col.row(align=True)
+        row.label(text="目标骨架：",icon="ARMATURE_DATA")
         if bpy.context.active_object and bpy.context.active_object.type=="ARMATURE":
-            row = col.row(align=True)
-            row.label(text="目标骨架：",icon="ARMATURE_DATA")
             row.label(text=bpy.context.active_object.name)
-            # col.prop(context.scene, "fdk_target_armature", text="目标骨架", icon="ARMATURE_DATA")
-        
-            if len(bpy.context.selected_objects)>0:
-                sel_obj=None
-                for obj in bpy.context.selected_objects:
-                    if obj.type=="ARMATURE" and obj.name != bpy.context.active_object.name:
-                        sel_obj=obj
-                if sel_obj:
-                    row = col.row(align=True)
-                    row.label(text="源骨架：",icon="ARMATURE_DATA")
-                    row.label(text=sel_obj.name)
-                    if context.scene.fdk_config_json_data:
-                        col.operator(O_CopyBone.bl_idname, text=O_CopyBone.bl_label, icon="ARMATURE_DATA")#复制位置
-                    else:
-                        col.label(text="先导入JSON才能复制位置")
-                else:
-                    col.label(text="先选择源骨架才能复制位置")
         else:
+            row.label(text="（未选择）")
+        
+        sel_obj=None
+        if len(bpy.context.selected_objects)>0:
+            for obj in bpy.context.selected_objects:
+                if obj.type=="ARMATURE" and obj.name != bpy.context.active_object.name:
+                    sel_obj=obj
+
+        row = col.row(align=True)
+        row.label(text="源骨架：",icon="ARMATURE_DATA")
+        if sel_obj is None:
+            row.label(text="（未选择）")
+        else:
+            row.label(text=sel_obj.name)
+        O_CopyBonecol = box.column(align=True)
+        O_CopyBonecol.operator(O_CopyBone.bl_idname, text=O_CopyBone.bl_label, icon="ARMATURE_DATA")#复制位置
+                
+        if (not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")) or (sel_obj is None):
+            O_CopyBonecol.enabled=False
             col.label(text="先选择骨架才能操作")
+        elif not context.scene.fdk_config_json_data:
+            O_CopyBonecol.enabled=False
+            col.label(text="先导入JSON才能操作")
                         
         # if context.scene.fdk_config_json_data:
             # col.prop(context.scene, "fdk_source_armature", text="源骨架", icon="ARMATURE_DATA")
@@ -705,46 +709,52 @@ class P_FDK_Snippets_Target(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         box = layout.box()
-        if bpy.context.active_object and bpy.context.active_object.type=="ARMATURE":
-            col = box.column(align=True)
-            col.label(text="与指定父级骨骼相关操作")
-            col.prop(context.scene, 'fdk_modify_headname',icon="BONE_DATA")
-            child_row = col.row(align=True)
-            if context.scene.fdk_modify_headname == "":
-                child_row.enabled = False
-            child_row.operator(O_DelBone.bl_idname, text=O_DelBone.bl_label, icon="BONE_DATA")#删除子级
-            child_row.operator(O_DelOtherBone.bl_idname, text=O_DelOtherBone.bl_label, icon="BONE_DATA")#删除其他
-            
-            if context.scene.fdk_config_json_data:
-                # col.label(text="Hint:父级为空则只按json复制指定子级，不会重命名其他")
-                # row.prop(context.scene, 'fdk_rename_copy_prefix')
-                row = col.row(align=True)
-                if context.scene.fdk_modify_headname == "":
-                    row.prop(context.scene, 'fdk_rename_orig_prefix')
-                    col.operator(O_RenameBone.bl_idname, text="复制指定子级", icon="BONE_DATA")#重命名子级
-                else:
-                    row.prop(context.scene, 'fdk_rename_orig_prefix')
-                    row.prop(context.scene, 'fdk_rename_prefix')
-                    col.operator(O_RenameBone.bl_idname, text="重命名及复制指定子级", icon="BONE_DATA")#重命名子级
-                col.operator(O_AddEmpty.bl_idname, text=O_AddEmpty.bl_label, icon="EMPTY_DATA")#添加空物体
-            else:
-                col.operator(O_ImportJSON.bl_idname, icon="IMPORT", text="脸部改名/添加空物体需先选择配置JSON")
-                
-            box = layout.box()
-            col = box.column(align=True)
-            col.label(text="依replace_dict.json重命名目标骨架")
-            col.operator(O_ImportRenameJSON.bl_idname, icon="IMPORT")#重命名配对JSON
-            O_RenameByJSONcol = box.column(align=True)
-            if not context.scene.fdk_rename_pair_json_data:
-                O_RenameByJSON.enabled = False
-            O_RenameByJSON.operator(O_RenameByJSON.bl_idname, text=O_RenameByJSON.bl_label, icon="BONE_DATA")
-        else:
-            col = box.column(align=True)
+        col = box.column(align=True)
+        
+        if not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE"):
+            box.enabled=False
             col.label(text="先选择目标骨架才能操作")
+        else:
+            col.label(text="与指定父级骨骼相关操作")
+            
+        col.prop(context.scene, 'fdk_modify_headname',icon="BONE_DATA")
+        child_row = col.row(align=True)
+        if context.scene.fdk_modify_headname == "":
+            child_row.enabled = False
+        child_row.operator(O_DelBone.bl_idname, text=O_DelBone.bl_label, icon="BONE_DATA")#删除子级
+        child_row.operator(O_DelOtherBone.bl_idname, text=O_DelOtherBone.bl_label, icon="BONE_DATA")#删除其他
+        
+        if context.scene.fdk_config_json_data:
+            # col.label(text="Hint:父级为空则只按json复制指定子级，不会重命名其他")
+            # row.prop(context.scene, 'fdk_rename_copy_prefix')
+            row = col.row(align=True)
+            if context.scene.fdk_modify_headname == "":
+                row.prop(context.scene, 'fdk_rename_orig_prefix')
+                col.operator(O_RenameBone.bl_idname, text="复制指定子级", icon="BONE_DATA")#重命名子级
+            else:
+                row.prop(context.scene, 'fdk_rename_orig_prefix')
+                row.prop(context.scene, 'fdk_rename_prefix')
+                col.operator(O_RenameBone.bl_idname, text="重命名及复制指定子级", icon="BONE_DATA")#重命名子级
+            col.operator(O_AddEmpty.bl_idname, text=O_AddEmpty.bl_label, icon="EMPTY_DATA")#添加空物体
+        else:
+            col.operator(O_ImportJSON.bl_idname, icon="IMPORT", text="脸部改名/添加空物体需先选择配置JSON")
+            
+        box = layout.box()
+        col = box.column(align=True)
+        col.label(text="依replace_dict.json重命名目标骨架")
+        if not context.scene.fdk_rename_pair_json_data:
+            col.operator(O_ImportRenameJSON.bl_idname, icon="IMPORT")#重命名配对JSON
+        else:
+            col.operator(O_ImportRenameJSON.bl_idname, icon="IMPORT", text="重选配对JSON")
+            
+        O_RenameByJSONcol = box.column(align=True)
+        if (not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")) or (not context.scene.fdk_rename_pair_json_data):
+            O_RenameByJSONcol.enabled = False
+        O_RenameByJSONcol.operator(O_RenameByJSON.bl_idname, text=O_RenameByJSON.bl_label, icon="BONE_DATA")
 
 class P_FDK_Snippets_Others(bpy.types.Panel):
     bl_idname = "FDK_Snippets_Others"
-    bl_label = "其他快捷"
+    bl_label = "其他快捷操作"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = 'FDK_Snippets'
@@ -765,15 +775,21 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
         if bpy.context.active_object and bpy.context.active_object.type=="EMPTY":
             row.operator(O_resetEmptyRot.bl_idname, text=O_resetEmptyRot.bl_label, icon="EMPTY_DATA")
         else:
-            row.label(text="")
+            row.label(text="（未选取空物体）")
         box = layout.box()
+        
         col = box.column(align=True)
+        row = col.row(align=True)
+        row.label(text="目标网格：")
         if bpy.context.active_object and bpy.context.active_object.type=="MESH":
-            row = col.row(align=True)
-            row.label(text="目标网格：")
             row.label(text=bpy.context.active_object.name)
+        else:
+            row.label(text="（未选择）")
+            col.label(text="选择网格才能操作")
+            
+        sel_obj=None
+        if bpy.context.active_object and bpy.context.active_object.type=="MESH":
             if len(bpy.context.selected_objects)>0:
-                sel_obj=None
                 for obj in bpy.context.selected_objects:
                     if obj.type=="MESH" and obj.name != bpy.context.active_object.name:
                         sel_obj=obj
@@ -781,11 +797,12 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
                     row = col.row(align=True)
                     row.label(text="源网格：")
                     row.label(text=sel_obj.name)
-                    col.operator(O_join_Meshes.bl_idname, text=O_join_Meshes.bl_label, icon="MESH_DATA")
                 else:
                     col.label(text="选择源网格才能合并")
-        else:
-            col.label(text="先选择网格才能操作")
+        col = box.column(align=True)
+        col.operator(O_join_Meshes.bl_idname, text=O_join_Meshes.bl_label, icon="MESH_DATA")
+        if (sel_obj is None) or (not (bpy.context.active_object and bpy.context.active_object.type=="MESH")):
+            col.enabled=False
             
         box = layout.box()
         col = box.column(align=True)
