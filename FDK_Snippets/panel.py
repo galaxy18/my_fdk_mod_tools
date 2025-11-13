@@ -83,6 +83,12 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
                     self.report({'INFO'}, f"JSON文件已导入({encoding}): {json_file}")
                     if "Headkey" in fdk_config_json_data:
                         context.scene.fdk_modify_headname=fdk_config_json_data["Headkey"]
+                    if "RenameBone_prefix" in fdk_config_json_data:
+                        context.scene.fdk_rename_prefix=fdk_config_json_data["RenameBone_prefix"]
+                    # if "RenameBone_copy_prefix" in fdk_config_json_data:
+                        # context.scene.fdk_rename_copy_prefix=fdk_config_json_data["RenameBone_copy_prefix"]
+                    if "RenameBone_orig_prefix" in fdk_config_json_data:
+                        context.scene.fdk_rename_orig_prefix=fdk_config_json_data["RenameBone_orig_prefix"]
                 return {'FINISHED'}
             except UnicodeDecodeError:
                 continue
@@ -143,14 +149,20 @@ class O_DelBone(bpy.types.Operator):
         return {'FINISHED'}
         
 class O_RenameBone(bpy.types.Operator):
-    #TODO: config prefix
     bl_idname = "fdktools.rename_head_bones"
     bl_label = "重命名脸部顶点组"
     bl_description = "根据所输入父级骨骼名字重命名目标骨架中的子级，根据JSON配置复制一份原名骨骼以应对定位"
 
     def execute(self, context):
         headkey=context.scene.fdk_modify_headname
-        self.report({'INFO'}, f"O_RenameBone：父级：{headkey}")
+        rename_prefix=context.scene.fdk_rename_prefix
+        rename_copy_prefix="_Copy"
+        rename_orig_prefix=context.scene.fdk_rename_orig_prefix
+        if rename_orig_prefix=="":
+            rename_orig_prefix="_Orig"
+            self.report({'INFO'}, "RenameBone_orig_prefix 是空的；自动重置为默认值")
+        if rename_copy_prefix == rename_prefix or rename_copy_prefix == rename_orig_prefix:
+            rename_copy_prefix="_Copying"
         if not "fdk_config_json_data" in context.scene:
             self.report({'ERROR'}, "没有选择配置文件") 
             return {'FINISHED'}
@@ -163,10 +175,15 @@ class O_RenameBone(bpy.types.Operator):
                 "请检查RenameBone_arr_copy和RenameBone_arr_copy_ignore。将不会复制定位骨骼")
                 arr_copy=[]
                 arr_copy_ignore=[]
+        self.report({'INFO'}, f"O_RenameBone：父级：{headkey}")
+                
         arm = bpy.data.objects.get(bpy.context.active_object.name).data
         bpy.ops.object.mode_set(mode='EDIT')
         newbones=[]
         for bonename in arr_copy:
+            if rename_prefix=="":
+                self.report({'ERROR'}, "后缀不能为空") 
+                return {'CANCELLED'}
             bpy.ops.armature.select_all(action='DESELECT')
             try:
                 if arm.edit_bones.get(bonename) is None:
@@ -176,14 +193,15 @@ class O_RenameBone(bpy.types.Operator):
                     arm.edit_bones.active = arm.edit_bones[bonename]
                     self.report({'INFO'}, bpy.context.selected_editable_bones[0].name)
                     b = bpy.context.selected_editable_bones[0]
-                    cb = arm.edit_bones.new(bonename+"_Copy")
+                    cb = arm.edit_bones.new(f"{bonename}{rename_copy_prefix}")
                     cb.head = b.head
                     cb.tail = b.tail
                     cb.matrix = b.matrix
                     cb.parent = b.parent
-                    newbones.append(cb)
                     if headkey=="":
-                        arm.edit_bones[bonename].name=bonename+"_Orig"
+                        arm.edit_bones[bonename].name=f"{bonename}{rename_orig_prefix}"
+                        newbones.append(cb)
+                    
             except Exception as e: self.report({'INFO'}, e)
             
         if not headkey=="":
@@ -192,13 +210,13 @@ class O_RenameBone(bpy.types.Operator):
             arm.edit_bones.active = arm.edit_bones[headkey]
             bpy.ops.armature.select_similar(type='CHILDREN')
             for obj in bpy.context.selected_editable_bones:
-                if not (obj.name in arr_copy_ignore or obj.name.endswith("_Copy") 
-                or obj.name.endswith("_New") or obj.name.endswith("_Orig")):
+                if not (obj.name in arr_copy_ignore or obj.name.endswith(rename_copy_prefix) 
+                or obj.name.endswith(rename_prefix) or obj.name.endswith(rename_orig_prefix)):
                     oldname = obj.name
-                    obj.name = oldname+"_New"
+                    obj.name = f"{oldname}{rename_prefix}"
                     
         for obj in newbones:
-            obj.name = obj.name.replace("_Copy", "")
+            obj.name = obj.name.replace(rename_copy_prefix, "")
 
         bpy.ops.object.mode_set(mode='OBJECT')
         self.report({'INFO'},f"O_RenameBone finished")
@@ -246,7 +264,7 @@ class O_AddEmpty(bpy.types.Operator):
                     emptyobj.parent_type = "BONE"
                     if obj[3] in arm.bones:
                         emptyobj.parent_bone = obj[3]
-                        emptyobj.location = arm.bones[obj[3]].tail
+                        emptyobj.location = arm.bones[obj[3]].head
                     else:
                         self.report({'ERROR'}, obj[0]+": parent bone "+obj[3]+" not exist")
                 elif obj[1] in bpy.data.objects:
@@ -689,14 +707,25 @@ class P_FDK_Snippets_Target(bpy.types.Panel):
         box = layout.box()
         if bpy.context.active_object and bpy.context.active_object.type=="ARMATURE":
             col = box.column(align=True)
-            col.label(text="指定父级骨骼")
+            col.label(text="与指定父级骨骼相关操作")
             col.prop(context.scene, 'fdk_modify_headname',icon="BONE_DATA")
-            row = col.row(align=True)
-            row.operator(O_DelBone.bl_idname, text=O_DelBone.bl_label, icon="BONE_DATA")#删除子级
-            row.operator(O_DelOtherBone.bl_idname, text=O_DelOtherBone.bl_label, icon="BONE_DATA")#删除其他
+            child_row = col.row(align=True)
+            if context.scene.fdk_modify_headname == "":
+                child_row.enabled = False
+            child_row.operator(O_DelBone.bl_idname, text=O_DelBone.bl_label, icon="BONE_DATA")#删除子级
+            child_row.operator(O_DelOtherBone.bl_idname, text=O_DelOtherBone.bl_label, icon="BONE_DATA")#删除其他
             
             if context.scene.fdk_config_json_data:
-                col.operator(O_RenameBone.bl_idname, text=O_RenameBone.bl_label, icon="BONE_DATA")#重命名子级
+                # col.label(text="Hint:父级为空则只按json复制指定子级，不会重命名其他")
+                # row.prop(context.scene, 'fdk_rename_copy_prefix')
+                row = col.row(align=True)
+                if context.scene.fdk_modify_headname == "":
+                    row.prop(context.scene, 'fdk_rename_orig_prefix')
+                    col.operator(O_RenameBone.bl_idname, text="复制指定子级", icon="BONE_DATA")#重命名子级
+                else:
+                    row.prop(context.scene, 'fdk_rename_orig_prefix')
+                    row.prop(context.scene, 'fdk_rename_prefix')
+                    col.operator(O_RenameBone.bl_idname, text="重命名及复制指定子级", icon="BONE_DATA")#重命名子级
                 col.operator(O_AddEmpty.bl_idname, text=O_AddEmpty.bl_label, icon="EMPTY_DATA")#添加空物体
             else:
                 col.operator(O_ImportJSON.bl_idname, icon="IMPORT", text="脸部改名/添加空物体需先选择配置JSON")
@@ -705,8 +734,10 @@ class P_FDK_Snippets_Target(bpy.types.Panel):
             col = box.column(align=True)
             col.label(text="依replace_dict.json重命名目标骨架")
             col.operator(O_ImportRenameJSON.bl_idname, icon="IMPORT")#重命名配对JSON
-            if context.scene.fdk_rename_pair_json_data:
-                col.operator(O_RenameByJSON.bl_idname, text=O_RenameByJSON.bl_label, icon="BONE_DATA")
+            O_RenameByJSONcol = box.column(align=True)
+            if not context.scene.fdk_rename_pair_json_data:
+                O_RenameByJSON.enabled = False
+            O_RenameByJSON.operator(O_RenameByJSON.bl_idname, text=O_RenameByJSON.bl_label, icon="BONE_DATA")
         else:
             col = box.column(align=True)
             col.label(text="先选择目标骨架才能操作")
@@ -731,7 +762,10 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
         row.operator(O_showEmpty.bl_idname, text=O_showEmpty.bl_label, icon="EMPTY_DATA")
         row = col.row(align=True)
         row.operator(O_delEmpty.bl_idname, text=O_delEmpty.bl_label, icon="EMPTY_DATA")
-        row.operator(O_resetEmptyRot.bl_idname, text=O_resetEmptyRot.bl_label, icon="EMPTY_DATA")
+        if bpy.context.active_object and bpy.context.active_object.type=="EMPTY":
+            row.operator(O_resetEmptyRot.bl_idname, text=O_resetEmptyRot.bl_label, icon="EMPTY_DATA")
+        else:
+            row.label(text="")
         box = layout.box()
         col = box.column(align=True)
         if bpy.context.active_object and bpy.context.active_object.type=="MESH":
@@ -752,10 +786,14 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
                     col.label(text="选择源网格才能合并")
         else:
             col.label(text="先选择网格才能操作")
-        if bpy.context.active_object and (bpy.context.active_object.type=="MESH" or bpy.context.active_object.type=="ARMATURE"):
-            col.operator(O_get_MaterialName.bl_idname, text=O_get_MaterialName.bl_label,icon="COPYDOWN")
-        else:
-            col.label(text="选择骨架或网格复制贴图到剪贴板")
+            
+        box = layout.box()
+        col = box.column(align=True)
+        col.label(text="选择骨架或网格复制贴图到剪贴板")
+        O_get_MaterialNamecol = box.column(align=True)
+        if not (bpy.context.active_object and (bpy.context.active_object.type=="MESH" or bpy.context.active_object.type=="ARMATURE")):
+            O_get_MaterialNamecol.enabled=False
+        O_get_MaterialNamecol.operator(O_get_MaterialName.bl_idname, text=O_get_MaterialName.bl_label,icon="COPYDOWN")
         # col.prop(context.scene, "fdk_source_mesh", text="源网格", icon="MESH_DATA")
         # col.prop(context.scene, "fdk_target_mesh", text="目标网格", icon="MESH_DATA")
         # col.operator(O_join_Meshes.bl_idname, text=O_join_Meshes.bl_label, icon="MESH_DATA")
@@ -796,7 +834,16 @@ def register():
         # description="选择将被作用的骨架",type=bpy.types.Object,poll=ObjType.is_armature
     # )
     bpy.types.Scene.fdk_modify_headname = bpy.props.StringProperty(
-        name="名字",description="设置父级名字",default= "Head"
+        name="父级",description="设置父级名字",default= "Head"
+    )
+    bpy.types.Scene.fdk_rename_prefix = bpy.props.StringProperty(
+        name="改名规则",description="设置要添加的后缀字符",default= "_New"
+    )
+    # bpy.types.Scene.fdk_rename_copy_prefix = bpy.props.StringProperty(
+        # name="备份",description="设置要添加到备份的后缀字符",default= "_Copy"
+    # )
+    bpy.types.Scene.fdk_rename_orig_prefix = bpy.props.StringProperty(
+        name="原骨骼改名规则",description="用于空re调整眼睛特写高度，将复制骨骼并按后缀重命名原骨骼",default= "_Orig"
     )
     # bpy.types.Scene.fdk_source_mesh = bpy.props.PointerProperty(
         # description="选择一个网格作为数据源",type=bpy.types.Object,poll=ObjType.is_mesh
@@ -835,4 +882,7 @@ def unregister():
     # del bpy.types.Scene.fdk_source_mesh
     # del bpy.types.Scene.fdk_target_mesh
     del bpy.types.Scene.fdk_modify_headname
+    del bpy.types.Scene.fdk_rename_prefix
+    # del bpy.types.Scene.fdk_rename_copy_prefix
+    del bpy.types.Scene.fdk_rename_orig_prefix
     
