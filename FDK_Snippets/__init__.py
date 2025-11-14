@@ -1,10 +1,10 @@
 bl_info = {
     "name": "FDK Snippets",
     "author": "",
-    "version": (1, 0, 2),
+    "version": (1, 0, 3),
     "blender": (4, 2, 3),
     "location": "View3D > Tool Shelf >FDK_Snippets Panel",
-    "description": "FDK Snippets",
+    "description": "FDK MOD制作 快捷代码",
     "warning": "",
     "wiki_url": "",
     "category": "3D View",
