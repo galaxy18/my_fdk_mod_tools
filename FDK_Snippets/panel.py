@@ -545,8 +545,8 @@ class O_del_glTF_not(bpy.types.Operator):
 ########################## Divider ##########################
 class O_remove_Empty_Bone(bpy.types.Operator):
     bl_idname = "fdktools.remove_bone_by_meshes"
-    bl_label = "清理骨骼"
-    bl_description = "删除无顶点组的骨骼"
+    bl_label = "⚠清理骨骼"
+    bl_description = "（实验功能）删除无顶点组的骨骼"
     
     def execute(self, context):
         bpy.context.window_manager.clipboard=""
@@ -584,6 +584,50 @@ class O_remove_Empty_Bone(bpy.types.Operator):
         self.report({'INFO'},f"O_remove_Empty_Bone finished")
         return {'FINISHED'}
     
+########################## Divider ##########################
+class O_compare_Armatures(bpy.types.Operator):
+    bl_idname = "fdktools.compare_arms"
+    bl_label = "提取骨骼名称差异"
+    bl_description = "比较所选骨架，获得差异的骨骼名称"
+    
+    def execute(self, context):
+        bones0=[]
+        bones=[]
+        result=""
+        bpy.context.window_manager.clipboard=""
+        arm = bpy.data.objects.get(bpy.context.active_object.name).data
+        arm0=None
+        for obj in bpy.context.selected_objects:
+            if obj.type=="ARMATURE" and obj.name != bpy.context.active_object.name:
+                arm0=obj.data
+        if arm0 is None:
+            self.report({'ERROR'}, "没有选择对象骨架")
+            return {'FINISHED'}
+        for bone in arm0.bones:
+            if not bone.name in arm.bones:
+                bones0.append(bone.name)
+        for bone in arm.bones:
+            if not bone.name in arm0.bones:
+                bones.append(bone.name)
+        
+        result+=f"{arm0.name}：\n    "
+        if len(bones0)==0:
+            result+="（无）\n"
+        else:
+            delimiter = "\n    "
+            result+=delimiter.join(bones0)
+        
+        result+=f"{arm.name}：\n    "
+        if len(bones)==0:
+            result+="（无）\n"
+        else:
+            delimiter = "\n    "
+            result+=delimiter.join(bones)
+            
+        self.report({'INFO'},result)
+        bpy.context.window_manager.clipboard=result
+        self.report({'INFO'},f"O_compare_Armatures finished")
+        return {'FINISHED'}
 ########################## Divider ##########################
 class O_get_Names_By_Armature(bpy.types.Operator):
     bl_idname = "fdktools.get_name_by_arm"
@@ -653,6 +697,8 @@ class O_select_Meshes_By_Armature(bpy.types.Operator):
                     meshes.append(obj)
             for mesh in meshes:
                 vg = mesh.vertex_groups
+                hide_state=mesh.hide_get()
+                mesh.hide_set(False)
                 bpy.context.view_layer.objects.active=mesh
                 bpy.ops.object.mode_set(mode='EDIT')
                 for bone in bones:
@@ -661,6 +707,7 @@ class O_select_Meshes_By_Armature(bpy.types.Operator):
                         bpy.data.objects.get(bpy.context.active_object.name).vertex_groups.active_index = vg_idx
                         bpy.ops.object.vertex_group_select()
                 bpy.ops.object.mode_set(mode='OBJECT')
+                mesh.hide_set(hide_state)
             bpy.context.view_layer.objects.active = baseobj
         else:
             self.report({'INFO'}, f"所选骨架中不存在{headkey}")
@@ -700,6 +747,8 @@ class O_unselect_Meshes_By_Armature(bpy.types.Operator):
                     meshes.append(obj)
             for mesh in meshes:
                 vg = mesh.vertex_groups
+                hide_state=mesh.hide_get()
+                mesh.hide_set(False)
                 bpy.context.view_layer.objects.active=mesh
                 bpy.ops.object.mode_set(mode='EDIT')
                 for bone in bones:
@@ -708,6 +757,7 @@ class O_unselect_Meshes_By_Armature(bpy.types.Operator):
                         bpy.data.objects.get(bpy.context.active_object.name).vertex_groups.active_index = vg_idx
                         bpy.ops.object.vertex_group_deselect()
                 bpy.ops.object.mode_set(mode='OBJECT')
+                mesh.hide_set(hide_state)
             bpy.context.view_layer.objects.active = baseobj
         else:
             self.report({'INFO'}, f"所选骨架中不存在{headkey}")
@@ -719,7 +769,7 @@ class O_unselect_Meshes_By_Armature(bpy.types.Operator):
 class O_join_Meshes(bpy.types.Operator):
     bl_idname = "fdktools.join_selected_meshes"
     bl_label = "JOIN & DELETE"
-    bl_description = "先选新的，再选旧的，然后JOIN。只有选择2个网格时才有效果。"
+    bl_description = "先选新的，再选旧的，然后JOIN。只有选择2个网格时才有效果。会重置选区。"
     
     def execute(self, context):
         mesh = bpy.data.objects.get(bpy.context.active_object.name)
@@ -842,6 +892,7 @@ class P_FDK_Snippets(bpy.types.Panel):
         else:
             row.label(text=sel_obj.name)
         O_CopyBonecol = box.column(align=True)
+        O_CopyBonecol.operator(O_compare_Armatures.bl_idname, text=O_compare_Armatures.bl_label, icon="COPYDOWN")#对比骨架
         O_CopyBonecol.operator(O_CopyBone.bl_idname, text=O_CopyBone.bl_label, icon="ARMATURE_DATA")#复制位置
                 
         if (not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")) or (sel_obj is None):
@@ -952,7 +1003,7 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
         if not (bpy.context.active_object and (bpy.context.active_object.type=="MESH" or bpy.context.active_object.type=="ARMATURE")):
             child_row.enabled = False
         child_row.operator(O_remove_Empty_Bone.bl_idname, text=O_remove_Empty_Bone.bl_label, icon="BONE_DATA")
-        child_row.operator(O_get_Names_By_Armature.bl_idname, text=O_get_Names_By_Armature.bl_label, icon="MESH_DATA")
+        child_row.operator(O_get_Names_By_Armature.bl_idname, text=O_get_Names_By_Armature.bl_label, icon="COPYDOWN")
 
         box = layout.box()
         col = box.column(align=True)
@@ -1003,6 +1054,7 @@ def register():
     bpy.utils.register_class(O_unselect_Meshes_By_Armature)
     bpy.utils.register_class(O_RenameBone)
     bpy.utils.register_class(O_CopyBone)
+    bpy.utils.register_class(O_compare_Armatures)
     bpy.utils.register_class(O_AddEmpty)
     bpy.utils.register_class(O_RenameByJSON)
     
@@ -1061,6 +1113,7 @@ def unregister():
     bpy.utils.unregister_class(O_unselect_Meshes_By_Armature)
     bpy.utils.unregister_class(O_RenameBone)
     bpy.utils.unregister_class(O_CopyBone)
+    bpy.utils.unregister_class(O_compare_Armatures)
     bpy.utils.unregister_class(O_AddEmpty)
     bpy.utils.unregister_class(O_RenameByJSON)
     
