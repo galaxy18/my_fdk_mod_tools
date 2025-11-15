@@ -69,7 +69,7 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
                 keys = ["CopyBone_arr_base","CopyBone_arr_names",
                     "CopyBone_arr_ignore","CopyBone_arr_add",
                     "CopyBone_arr_add_ignore","AddEmpty_arr_addPoint",
-                    "RenameBone_arr_copy","RenameBone_arr_copy_ignore"]
+                    "RenameBone_arr_copy","RenameBone_arr_ignore","RemoveBone_arr_shouldKeep"]
                 missingkey=False
                 for key in keys:
                     if not key in fdk_config_json_data or not "data" in fdk_config_json_data[key]:
@@ -80,13 +80,13 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
                     f"但缺少{warning}字段；建议检查JSON文件后重新导入")
                 else:
                     self.report({'INFO'}, f"JSON文件已导入({encoding}): {json_file}")
-                    if "Headkey" in fdk_config_json_data:
+                    if "Headkey" in fdk_config_json_data and (not fdk_config_json_data["Headkey"]==""):
                         context.scene.fdk_modify_headname=fdk_config_json_data["Headkey"]
-                    if "RenameBone_prefix" in fdk_config_json_data:
+                    if "RenameBone_prefix" in fdk_config_json_data and (not fdk_config_json_data["RenameBone_prefix"]==""):
                         context.scene.fdk_rename_prefix=fdk_config_json_data["RenameBone_prefix"]
                     # if "RenameBone_copy_prefix" in fdk_config_json_data:
                         # context.scene.fdk_rename_copy_prefix=fdk_config_json_data["RenameBone_copy_prefix"]
-                    if "RenameBone_orig_prefix" in fdk_config_json_data:
+                    if "RenameBone_orig_prefix" in fdk_config_json_data and (not fdk_config_json_data["RenameBone_orig_prefix"]==""):
                         context.scene.fdk_rename_orig_prefix=fdk_config_json_data["RenameBone_orig_prefix"]
                 return {'FINISHED'}
             except UnicodeDecodeError:
@@ -171,12 +171,12 @@ class O_RenameBone(bpy.types.Operator):
         else:
             try:
                 arr_copy=json.loads(context.scene["fdk_config_json_data"])["RenameBone_arr_copy"]["data"]
-                arr_copy_ignore=json.loads(context.scene["fdk_config_json_data"])["RenameBone_arr_copy_ignore"]["data"]
+                arr_ignore=json.loads(context.scene["fdk_config_json_data"])["RenameBone_arr_ignore"]["data"]
             except:
                 self.report({'ERROR'}, "无效的配置JSON；"+
-                "请检查RenameBone_arr_copy和RenameBone_arr_copy_ignore。将不会复制定位骨骼")
+                "请检查RenameBone_arr_copy和RenameBone_arr_ignore。将不会复制定位骨骼")
                 arr_copy=[]
-                arr_copy_ignore=[]
+                arr_ignore=[]
         self.report({'INFO'}, f"O_RenameBone：父级：{headkey}")
                 
         arm = bpy.data.objects.get(bpy.context.active_object.name).data
@@ -209,7 +209,7 @@ class O_RenameBone(bpy.types.Operator):
             arm.edit_bones.active = arm.edit_bones[headkey]
             bpy.ops.armature.select_similar(type='CHILDREN')
             for obj in bpy.context.selected_editable_bones:
-                if not (obj.name in arr_copy_ignore or obj.name.endswith(rename_copy_prefix) 
+                if not (obj.name in arr_ignore or obj.name.endswith(rename_copy_prefix) 
                 or obj.name.endswith(rename_prefix) or obj.name.endswith(rename_orig_prefix)):
                     oldname = obj.name
                     obj.name = f"{oldname}{rename_prefix}"
@@ -301,14 +301,14 @@ class O_CopyBone(bpy.types.Operator):
             if arm.edit_bones.get(b_orig.parent.name) is None:
                 O_CopyBone.create_Parent(arm0, arm, b_orig.parent)
             b.parent = arm.edit_bones[b_orig.parent.name]
+            for child in b_orig.children:
+                # _console.report({'INFO'}, '    child:'+child.name)
+                O_CopyBone.create_Bone(_console, _context, arm0, arm, child)
         # _console.report({'INFO'}, '    processing children of'+b_orig.name)
         for obj in bpy.data.objects:
             if obj.parent_type=='BONE' and obj.parent_bone == b_orig.name and obj.type == "EMPTY":
                 obj.rotation_quaternion = Quaternion([1,0,0,0])
                 obj.scale = [1.0,1.0,1.0]
-        for child in b_orig.children:
-            # _console.report({'INFO'}, '    child:'+child.name)
-            O_CopyBone.create_Bone(_console, _context, arm0, arm, child)
 
     def create_Parent(arm0, arm, b_orig):
         _console.report({'INFO'}, '        Info: creating parent bone '+b_orig.name+' can not be skipped')
@@ -558,6 +558,10 @@ class O_remove_Empty_Bone(bpy.types.Operator):
         else:
             baseobj = bpy.context.active_object
         arm = bpy.data.objects.get(baseobj.name).data
+        try:
+            arr_shouldkeep=json.loads(context.scene["fdk_config_json_data"])["RemoveBone_arr_shouldKeep"]["data"]
+        except:
+            arr_shouldkeep=[]
         
         for obj in bpy.data.objects:
             if obj.type=="MESH" and (not obj.parent is None) and obj.parent.name == baseobj.name:
@@ -575,10 +579,13 @@ class O_remove_Empty_Bone(bpy.types.Operator):
         self.report({'INFO'},f"O_remove_Empty_Bone collecting...")
         for bone in arm.edit_bones:
             if bone.name in bones:
-                bone.select = True
-                bone.select_head = True
-                bone.select_tail = True
-                self.report({'INFO'},f"{bone.name}")
+                if bone.name in arr_shouldkeep:
+                    self.report({'INFO'},f"{bone.name} keeped")
+                else:
+                    bone.select = True
+                    bone.select_head = True
+                    bone.select_tail = True
+                    self.report({'INFO'},f"{bone.name} removed")
         bpy.ops.armature.delete()
         bpy.ops.object.mode_set(mode='OBJECT')
         self.report({'INFO'},f"O_remove_Empty_Bone finished")
