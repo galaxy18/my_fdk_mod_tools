@@ -223,8 +223,8 @@ class O_RenameBone(bpy.types.Operator):
         
 class O_AddEmpty(bpy.types.Operator):
     bl_idname = "fdktools.add_empty_objects"
-    bl_label = "添加空物体"
-    bl_description = "添加空物体。配置中父级为骨架的将设为目标骨架"
+    bl_label = "按JSON添加空物体"
+    bl_description = "按JSON添加空物体。配置中父级为骨架的将设为目标骨架"
     
     def execute(self, context):
         if not "fdk_config_json_data" in context.scene:
@@ -288,6 +288,7 @@ class O_CopyBone(bpy.types.Operator):
     bl_description = "根据JSON配置复制源骨架的位置到目标骨架"
 
     def create_Bone(_console, _context, arm0, arm, b_orig):
+        resetempty=_context.scene["resetempty"]
         try:
             arr_add_ignore = json.loads(_context.scene["fdk_config_json_data"])["CopyBone_arr_add_ignore"]["data"]
         except:
@@ -305,23 +306,30 @@ class O_CopyBone(bpy.types.Operator):
                 # _console.report({'INFO'}, '    child:'+child.name)
                 O_CopyBone.create_Bone(_console, _context, arm0, arm, child)
         # _console.report({'INFO'}, '    processing children of'+b_orig.name)
-        for obj in bpy.data.objects:
-            if obj.parent_type=='BONE' and obj.parent_bone == b_orig.name and obj.type == "EMPTY":
-                obj.rotation_quaternion = Quaternion([1,0,0,0])
-                obj.scale = [1.0,1.0,1.0]
+        #重置空物体旋转
+        if resetempty == True:
+            for obj in bpy.data.objects:
+                if obj.parent_type=='BONE' and obj.parent_bone == b_orig.name and obj.type == "EMPTY":
+                    obj.rotation_quaternion = Quaternion([1,0,0,0])
+                    obj.scale = [1.0,1.0,1.0]
 
     def create_Parent(arm0, arm, b_orig):
+        changematrix=_context.scene["changematrix"]
         _console.report({'INFO'}, '        Info: creating parent bone '+b_orig.name+' can not be skipped')
         if arm.edit_bones.get(b_orig.name) is None:
             b = arm.edit_bones.new(b_orig.name)
             b.head = b_orig.head
             b.tail = b_orig.tail
-            b.matrix = b_orig.matrix
+            if changematrix==True:
+                b.matrix = b_orig.matrix
             if arm.edit_bones.get(b_orig.parent.name) is None:
                 O_CopyBone.create_Parent(arm0, arm, b_orig.parent)
             b.parent = arm.edit_bones[b_orig.parent.name]
 
     def processname(_console, _context, arm0, arm, b_child, processchild=True):
+        changematrix=_context.scene["change_matrix"]
+        resetempty=_context.scene["reset_empty"]
+        changetail=_context.scene["change_tail"]
         try:
             arr_ignore = json.loads(_context.scene["fdk_config_json_data"])["CopyBone_arr_ignore"]["data"]
         except:
@@ -330,25 +338,29 @@ class O_CopyBone(bpy.types.Operator):
         try:
             if arm.edit_bones.get(b_child.name) is None:
                 O_CopyBone.create_Bone(_console, _context, arm0, arm, b_child)
-                _console.report({'INFO'}, b_child.name)
             elif not b_child.name in arr_ignore:
                 _console.report({'INFO'}, "Moving bone "+b_child.name)
                 b=arm.edit_bones[b_child.name]
                 changes=mathutils.Vector((b.head[0]-b_child.head[0],
                     b.head[1]-b_child.head[1],
                     b.head[2]-b_child.head[2]))
-                b.tail = [b.tail[0]-b.head[0]+b_child.head[0],
-                    b.tail[1]-b.head[1]+b_child.head[1],
-                    b.tail[2]-b.head[2]+b_child.head[2]]
+                if changetail == True:
+                    b.tail = [b.tail[0]-b.head[0]+b_child.head[0],
+                        b.tail[1]-b.head[1]+b_child.head[1],
+                        b.tail[2]-b.head[2]+b_child.head[2]]
+                else:
+                    b.tail = b_child.tail
                 b.head = b_child.head
-                #b.matrix = b_child.matrix
+                if changematrix==True:
+                    b.matrix = b_child.matrix
                 #b.parent = b_child.parent
-            for obj in bpy.data.objects:
-                if obj.parent_type=='BONE' and obj.parent_bone == b_child.name and obj.type == "EMPTY":
-                    _console.report({'INFO'}, f"    Moving EMPTY obj: {obj.name} {changes}")
-                    obj.rotation_quaternion = Quaternion([1,0,0,0])
-                    obj.scale = [1.0,1.0,1.0]
-                    obj.location += changes
+            if resetempty == True:
+                for obj in bpy.data.objects:
+                    if obj.parent_type=='BONE' and obj.parent_bone == b_child.name and obj.type == "EMPTY":
+                        _console.report({'INFO'}, f"    Moving EMPTY obj: {obj.name} {changes}")
+                        obj.rotation_quaternion = Quaternion([1,0,0,0])
+                        obj.scale = [1.0,1.0,1.0]
+                        obj.location += changes
         except Exception as e: _console.report({'INFO'}, f"{e}")
         if processchild:
             for child in b_child.children:
@@ -382,6 +394,18 @@ class O_CopyBone(bpy.types.Operator):
             except:
                 self.report({'INFO'}, "无效的配置JSON；CopyBone_arr_add。将忽略此配置")
                 arr_add=[]
+        try:
+            changematrix=context.scene["change_matrix"]
+        except:
+            context.scene["change_matrix"]=False
+        try:
+            changematrix=context.scene["reset_empty"]
+        except:
+            context.scene["reset_empty"]=True
+        try:
+            changematrix=context.scene["change_tail"]
+        except:
+            context.scene["change_tail"]=True
                 
         arm = bpy.data.objects.get(bpy.context.active_object.name).data
         arm0=None
@@ -507,10 +531,10 @@ class O_delEmpty(bpy.types.Operator):
         self.report({'INFO'},f"O_delEmpty finished")
         return {'FINISHED'}
         
-class O_resetEmptyRot(bpy.types.Operator):
-    bl_idname = "fdktools.reset_empty_object"
-    bl_label = "重设空物体旋转"
-    bl_description = "重设空物体旋转为默认数值。请确保选取了空物体并可见，否则无效果"
+class O_resetEmptyRot1(bpy.types.Operator):
+    bl_idname = "fdktools.reset_empty_object1"
+    bl_label = "空物体旋转0,0"
+    bl_description = "重设空物体旋转为1,0,0,0。请确保选取了空物体并可见，否则无效果"
     
     def execute(self, context):
         if bpy.context.active_object:
@@ -519,6 +543,25 @@ class O_resetEmptyRot(bpy.types.Operator):
                 emptyobj.rotation_mode = "QUATERNION"
                 #emptyobj.rotation_quaternion = Quaternion([math.sin(math.pi/4),-math.sin(math.pi/4),0,0])
                 emptyobj.rotation_quaternion = Quaternion([1,0,0,0])
+                emptyobj.scale = [1.0,1.0,1.0]
+                self.report({'INFO'},f"O_resetEmptyRot finished")
+            else:
+                self.report({'INFO'},f"物体类型不为EMPTY")
+        else:
+            self.report({'INFO'},f"请切换编辑模式并令物体可见")
+        return {'FINISHED'}
+        
+class O_resetEmptyRot2(bpy.types.Operator):
+    bl_idname = "fdktools.reset_empty_object2"
+    bl_label = "空物体旋转90,-90"
+    bl_description = "重设空物体旋转为90,-90,0,0。请确保选取了空物体并可见，否则无效果"
+    
+    def execute(self, context):
+        if bpy.context.active_object:
+            if bpy.context.active_object.type == "EMPTY":
+                emptyobj=bpy.data.objects[bpy.context.active_object.name]
+                emptyobj.rotation_mode = "QUATERNION"
+                emptyobj.rotation_quaternion = Quaternion([math.sin(math.pi/4),-math.sin(math.pi/4),0,0])
                 emptyobj.scale = [1.0,1.0,1.0]
                 self.report({'INFO'},f"O_resetEmptyRot finished")
             else:
@@ -900,7 +943,13 @@ class P_FDK_Snippets(bpy.types.Panel):
             row.label(text=sel_obj.name)
         O_CopyBonecol = box.column(align=True)
         O_CopyBonecol.operator(O_compare_Armatures.bl_idname, text=O_compare_Armatures.bl_label, icon="COPYDOWN")#对比骨架
+        
         O_CopyBonecol.operator(O_CopyBone.bl_idname, text=O_CopyBone.bl_label, icon="ARMATURE_DATA")#复制位置
+        
+        # row = O_CopyBonecol.row(align=True)
+        # row.prop(context.scene, "change_matrix", text="copy_matrix")
+        # row.prop(context.scene, "change_tail", text="copy_tail")
+        # row.prop(context.scene, "reset_empty", text="reset_empty")
                 
         if (not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")) or (sel_obj is None):
             O_CopyBonecol.enabled=False
@@ -971,7 +1020,7 @@ class P_FDK_Snippets_Target(bpy.types.Panel):
             
         box = layout.box()
         col = box.column(align=True)
-        col.label(text="依replace_dict.json重命名目标骨架")
+        col.label(text="依照replace_dict.json重命名目标骨架")
         if not context.scene.fdk_rename_pair_json_data:
             col.operator(O_ImportRenameJSON.bl_idname, icon="IMPORT")#重命名配对JSON
         else:
@@ -1000,12 +1049,14 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
         row = col.row(align=True)
         row.operator(O_hideEmpty.bl_idname, text=O_hideEmpty.bl_label, icon="EMPTY_DATA")
         row.operator(O_showEmpty.bl_idname, text=O_showEmpty.bl_label, icon="EMPTY_DATA")
-        row = col.row(align=True)
         row.operator(O_delEmpty.bl_idname, text=O_delEmpty.bl_label, icon="EMPTY_DATA")
-        if bpy.context.active_object and bpy.context.active_object.type=="EMPTY":
-            row.operator(O_resetEmptyRot.bl_idname, text=O_resetEmptyRot.bl_label, icon="EMPTY_DATA")
-        else:
-            row.label(text="（未选取空物体）")
+        
+        child_row = col.row(align=True)
+        if not (bpy.context.active_object and bpy.context.active_object.type=="EMPTY"):
+            child_row.enabled = False
+        child_row.operator(O_resetEmptyRot1.bl_idname, text=O_resetEmptyRot1.bl_label, icon="EMPTY_DATA")
+        child_row.operator(O_resetEmptyRot2.bl_idname, text=O_resetEmptyRot2.bl_label, icon="EMPTY_DATA")
+        
         child_row = col.row(align=True)
         if not (bpy.context.active_object and (bpy.context.active_object.type=="MESH" or bpy.context.active_object.type=="ARMATURE")):
             child_row.enabled = False
@@ -1068,7 +1119,8 @@ def register():
     bpy.utils.register_class(O_hideEmpty)
     bpy.utils.register_class(O_showEmpty)
     bpy.utils.register_class(O_delEmpty)
-    bpy.utils.register_class(O_resetEmptyRot)
+    bpy.utils.register_class(O_resetEmptyRot1)
+    bpy.utils.register_class(O_resetEmptyRot2)
     bpy.utils.register_class(O_del_glTF_not)
     bpy.utils.register_class(O_join_Meshes)
     bpy.utils.register_class(O_get_MaterialName)
@@ -1109,6 +1161,15 @@ def register():
     # bpy.types.Scene.fdk_target_mesh = bpy.props.PointerProperty(
         # description="选择将被作用的网格",type=bpy.types.Object,poll=ObjType.is_mesh
     # )
+    bpy.types.Scene.change_matrix = bpy.props.BoolProperty(
+        name="copy matrix",description="(实验功能)",default= False
+    )
+    bpy.types.Scene.change_tail = bpy.props.BoolProperty(
+        name="copy tail",description="(实验功能)",default= True
+    )
+    bpy.types.Scene.reset_empty = bpy.props.BoolProperty(
+        name="reset empty",description="(实验功能)",default= True
+    )
 
 def unregister():
     # bpy.utils.unregister_class(O_AssignArmature)
@@ -1127,7 +1188,8 @@ def unregister():
     bpy.utils.unregister_class(O_hideEmpty)
     bpy.utils.unregister_class(O_showEmpty)
     bpy.utils.unregister_class(O_delEmpty)
-    bpy.utils.unregister_class(O_resetEmptyRot)
+    bpy.utils.unregister_class(O_resetEmptyRot1)
+    bpy.utils.unregister_class(O_resetEmptyRot2)
     bpy.utils.unregister_class(O_del_glTF_not)
     bpy.utils.unregister_class(O_join_Meshes)
     bpy.utils.unregister_class(O_get_MaterialName)
@@ -1149,3 +1211,6 @@ def unregister():
     # del bpy.types.Scene.fdk_rename_copy_prefix
     del bpy.types.Scene.fdk_rename_orig_prefix
     
+    del bpy.types.Scene.change_matrix
+    del bpy.types.Scene.change_tail
+    del bpy.types.Scene.reset_empty

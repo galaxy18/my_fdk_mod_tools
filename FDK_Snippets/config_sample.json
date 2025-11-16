@@ -1,7 +1,7 @@
 {
-    "Headkey": "Hea",
-    "RenameBone_prefix": "_Ne",
-    "RenameBone_orig_prefix": "_Ori",
+    "Headkey": "Head",
+    "RenameBone_prefix": "_New",
+    "RenameBone_orig_prefix": "_Orig",
     "RenameBone_arr_copy": {
         "desc": "重命名脸部-复制一份原名骨骼以应对定位",
         "data": [
@@ -18,7 +18,7 @@
             "Face_Root"
         ]
     },
-    "RenameBone_arr_ignore": {
+    "RenameBone_arr_copy_ignore": {
         "desc": "重命名脸部时要忽略的顶点组",
         "data": [
             "Head"
@@ -113,21 +113,6 @@
                 "OBJECT",
                 ""
             ]
-        ],
-        "comments": []
-    },
-    "RemoveBone_arr_shouldKeep":{
-        "desc": "清理无对应顶点的骨骼时必须保留的名称",
-        "data": [
-            "Up_Point",
-            "Left_Eye",
-            "Right_Eye",
-            "Left_eye",
-            "Right_eye",
-            "R_highlight",
-            "R_Highlight",
-            "L_highlight",
-            "L_Highlight"
         ],
         "comments": []
     }
