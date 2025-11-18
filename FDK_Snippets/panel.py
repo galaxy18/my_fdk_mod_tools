@@ -578,7 +578,8 @@ class O_del_glTF_not(bpy.types.Operator):
     def execute(self, context):
         bpy.ops.object.select_all(action='DESELECT')
         collection = bpy.data.collections.get('glTF_not_exported')
-        bpy.data.collections.remove(collection)
+        if not collection is None:
+            bpy.data.collections.remove(collection)
         for obj in bpy.data.objects:
             if obj.type == "ARMATURE":
                 for bone in obj.pose.bones:
