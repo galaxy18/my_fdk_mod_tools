@@ -570,6 +570,24 @@ class O_resetEmptyRot2(bpy.types.Operator):
             self.report({'INFO'},f"请切换编辑模式并令物体可见")
         return {'FINISHED'}
         
+class O_copyEmptyRot(bpy.types.Operator):
+    bl_idname = "fdktools.copy_empty_rotation"
+    bl_label = "复制空物体旋转缩放"
+    bl_description = "请确保选取了空物体，否则无效果"
+    
+    def execute(self, context):
+        if (not bpy.context.active_object) or (len(bpy.context.selected_objects)!=2) or (bpy.context.selected_objects[0].type != "EMPTY") or (bpy.context.selected_objects[1].type != "EMPTY"):
+            return {'CANCELLED'}
+        target = bpy.context.active_object
+        # source.hide_set(False)
+        # target.hide_set(False)
+        for obj in bpy.context.selected_objects:
+            if obj.name != target.name:
+                source = obj
+        target.rotation_quaternion = source.rotation_quaternion
+        target.scale = source.scale
+        return {'FINISHED'}
+        
 class O_del_glTF_not(bpy.types.Operator):
     bl_idname = "fdktools.remove_gltf_collection"
     bl_label = "清理glTF_not_exported"
@@ -1057,6 +1075,7 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
             child_row.enabled = False
         child_row.operator(O_resetEmptyRot1.bl_idname, text=O_resetEmptyRot1.bl_label, icon="EMPTY_DATA")
         child_row.operator(O_resetEmptyRot2.bl_idname, text=O_resetEmptyRot2.bl_label, icon="EMPTY_DATA")
+        child_row.operator(O_copyEmptyRot.bl_idname, text=O_copyEmptyRot.bl_label, icon="EMPTY_DATA")
         
         child_row = col.row(align=True)
         if not (bpy.context.active_object and (bpy.context.active_object.type=="MESH" or bpy.context.active_object.type=="ARMATURE")):
@@ -1122,6 +1141,7 @@ def register():
     bpy.utils.register_class(O_delEmpty)
     bpy.utils.register_class(O_resetEmptyRot1)
     bpy.utils.register_class(O_resetEmptyRot2)
+    bpy.utils.register_class(O_copyEmptyRot)
     bpy.utils.register_class(O_del_glTF_not)
     bpy.utils.register_class(O_join_Meshes)
     bpy.utils.register_class(O_get_MaterialName)
@@ -1191,6 +1211,7 @@ def unregister():
     bpy.utils.unregister_class(O_delEmpty)
     bpy.utils.unregister_class(O_resetEmptyRot1)
     bpy.utils.unregister_class(O_resetEmptyRot2)
+    bpy.utils.unregister_class(O_copyEmptyRot)
     bpy.utils.unregister_class(O_del_glTF_not)
     bpy.utils.unregister_class(O_join_Meshes)
     bpy.utils.unregister_class(O_get_MaterialName)

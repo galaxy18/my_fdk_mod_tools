@@ -1,7 +1,7 @@
 bl_info = {
     "name": "FDK Snippets",
     "author": "",
-    "version": (1, 0, 4),
+    "version": (1, 0, 5),
     "blender": (4, 2, 3),
     "location": "View3D > Tool Shelf >FDK_Snippets Panel",
     "description": "FDK MOD制作 快捷代码",
@@ -13,6 +13,7 @@ bl_info = {
 #1.02:取消隐藏按钮，改为变灰，改善视觉感受
 #1.03:添加清理无顶点组骨骼（未测试是否会造成问题）
 #1.04:增加了不清理的顶点组配置。增加了另一种重置空物体旋转选项。
+#1.05:增加了复制一个空物体旋转和缩放值到另一个空物体。
 ########################## Divider ##########################
 from . import panel
 
