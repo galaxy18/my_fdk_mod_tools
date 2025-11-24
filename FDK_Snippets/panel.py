@@ -65,6 +65,12 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
                     fdk_config_json_data=json.load(file)
                     context.scene["fdk_config_json_data"]=json.dumps(fdk_config_json_data)
                 self.report({'INFO'}, f"JSON文件已导入({encoding}): {json_file}")
+                if "change_tail" in fdk_config_json_data:
+                    context.scene.change_tail = fdk_config_json_data["change_tail"]
+                    self.report({'INFO'}, f"change_tail={context.scene.change_tail}")
+                if "resetempty" in fdk_config_json_data:
+                    context.scene.change_tail = fdk_config_json_data["resetempty"]
+                    self.report({'INFO'}, f"resetempty={context.scene.resetempty}")
                 warning = ""
                 keys = ["CopyBone_arr_base","CopyBone_arr_names",
                     "CopyBone_arr_ignore","CopyBone_arr_add",
@@ -578,7 +584,7 @@ class O_copyEmptyRot(bpy.types.Operator):
     def execute(self, context):
         if (not bpy.context.active_object) or (len(bpy.context.selected_objects)!=2) or (bpy.context.selected_objects[0].type != "EMPTY") or (bpy.context.selected_objects[1].type != "EMPTY"):
             return {'CANCELLED'}
-        target = bpy.context.active_object
+        target = bpy.data.objects[bpy.context.active_object.name]
         # source.hide_set(False)
         # target.hide_set(False)
         for obj in bpy.context.selected_objects:
@@ -586,6 +592,7 @@ class O_copyEmptyRot(bpy.types.Operator):
                 source = obj
         target.rotation_quaternion = source.rotation_quaternion
         target.scale = source.scale
+        self.report({'INFO'},f"copy_empty_rotation finished")
         return {'FINISHED'}
         
 class O_del_glTF_not(bpy.types.Operator):
