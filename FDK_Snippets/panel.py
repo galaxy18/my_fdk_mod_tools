@@ -68,9 +68,9 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
                 if "change_tail" in fdk_config_json_data:
                     context.scene.change_tail = fdk_config_json_data["change_tail"]
                     self.report({'INFO'}, f"change_tail={context.scene.change_tail}")
-                if "resetempty" in fdk_config_json_data:
-                    context.scene.change_tail = fdk_config_json_data["resetempty"]
-                    self.report({'INFO'}, f"resetempty={context.scene.resetempty}")
+                if "reset_empty" in fdk_config_json_data:
+                    context.scene.change_tail = fdk_config_json_data["reset_empty"]
+                    self.report({'INFO'}, f"reset_empty={context.scene.reset_empty}")
                 warning = ""
                 keys = ["CopyBone_arr_base","CopyBone_arr_names",
                     "CopyBone_arr_ignore","CopyBone_arr_add",
@@ -294,7 +294,7 @@ class O_CopyBone(bpy.types.Operator):
     bl_description = "根据JSON配置复制源骨架的位置到目标骨架"
 
     def create_Bone(_console, _context, arm0, arm, b_orig):
-        resetempty=_context.scene["resetempty"]
+        resetempty=_context.scene["reset_empty"]
         try:
             arr_add_ignore = json.loads(_context.scene["fdk_config_json_data"])["CopyBone_arr_add_ignore"]["data"]
         except:

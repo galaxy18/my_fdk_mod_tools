@@ -3,7 +3,7 @@
     "RenameBone_prefix": "_New",
     "RenameBone_orig_prefix": "_Orig",
     "change_tail":false,
-    "resetempty":false,
+    "reset_empty":false,
     "RenameBone_arr_copy": {
         "desc": "重命名脸部-复制一份原名骨骼以应对定位",
         "data": [
@@ -41,11 +41,12 @@
     "CopyBone_arr_names": {
         "desc": "复制位置-用于复制骨骼定位，但不处理子元素",
         "data": [
-            "D:\\mod\\Ys8_IT3-main\\c0000",
-            "root",
-            "Null_ALL"
+            "Root"
         ],
         "comments": [
+            "D:\\mod\\Ys8_IT3-main\\c0000",
+            "root",
+            "Null_ALL",
             "Head"
         ]
     },
