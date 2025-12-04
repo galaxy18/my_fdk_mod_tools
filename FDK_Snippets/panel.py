@@ -659,11 +659,41 @@ class O_remove_Empty_Bone(bpy.types.Operator):
         bpy.ops.object.mode_set(mode='OBJECT')
         self.report({'INFO'},f"O_remove_Empty_Bone finished")
         return {'FINISHED'}
+########################## Divider ##########################
+class O_copy_Armatures(bpy.types.Operator):
+    bl_idname = "fdktools.copy_arms"
+    bl_label = "补充结构"
+    bl_description = "直接补充缺少的结构，不读取json配置"
     
+    def execute(self, context):
+        arm = bpy.data.objects.get(bpy.context.active_object.name).data
+        arm0=None
+        for obj in bpy.context.selected_objects:
+            if obj.type=="ARMATURE" and obj.name != bpy.context.active_object.name:
+                arm0=obj.data
+        bpy.ops.object.mode_set(mode='EDIT')
+        bnew=[]
+        for b_orig in arm0.edit_bones:
+            if not b_orig.name in arm.edit_bones:
+                self.report({'INFO'},'Creating '+b_orig.name)
+                b = arm.edit_bones.new(b_orig.name)
+                b.head = b_orig.head
+                b.tail = b_orig.tail
+                b.matrix = b_orig.matrix
+                bnew.append(b)
+        for b_orig in bnew:
+            if arm0.edit_bones[b_orig.name].parent:
+                b_orig.parent = arm.edit_bones[arm0.edit_bones[b_orig.name].parent.name]
+            for child in arm0.edit_bones[b_orig.name].children:
+                self.report({'INFO'},f'Attaching {child.name} to {b_orig.name}')
+                arm.edit_bones[child.name].parent=b_orig
+        bpy.ops.object.mode_set(mode='OBJECT')
+        self.report({'INFO'},f"O_copy_Armatures finished")
+        return {'FINISHED'}
 ########################## Divider ##########################
 class O_compare_Armatures(bpy.types.Operator):
     bl_idname = "fdktools.compare_arms"
-    bl_label = "提取骨骼名称差异"
+    bl_label = "对比骨架"
     bl_description = "比较所选骨架，获得差异的骨骼名称"
     
     def execute(self, context):
@@ -968,21 +998,28 @@ class P_FDK_Snippets(bpy.types.Panel):
         else:
             row.label(text=sel_obj.name)
         O_CopyBonecol = box.column(align=True)
-        O_CopyBonecol.operator(O_compare_Armatures.bl_idname, text=O_compare_Armatures.bl_label, icon="COPYDOWN")#对比骨架
-        
         O_CopyBonecol.operator(O_CopyBone.bl_idname, text=O_CopyBone.bl_label, icon="ARMATURE_DATA")#复制位置
+                
+        if (not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")) or (sel_obj is None):
+            O_CopyBonecol.enabled=False
+            col = box.column(align=True)
+            col.label(text="先选择骨架才能操作")
+        elif not context.scene.fdk_config_json_data:
+            O_CopyBonecol.enabled=False
+            col = box.column(align=True)
+            col.label(text="先导入JSON才能操作")
+        
+        col = box.column(align=True)
+        O_CopyBonerow = col.row(align=True)
+        O_CopyBonerow.operator(O_compare_Armatures.bl_idname, text=O_compare_Armatures.bl_label, icon="COPYDOWN")#对比骨架
+        O_CopyBonerow.operator(O_copy_Armatures.bl_idname, text=O_copy_Armatures.bl_label, icon="COPYDOWN")#复制结构
+        
+        col.enabled = (not sel_obj is None) and (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")
         
         # row = O_CopyBonecol.row(align=True)
         # row.prop(context.scene, "change_matrix", text="copy_matrix")
         # row.prop(context.scene, "change_tail", text="copy_tail")
         # row.prop(context.scene, "reset_empty", text="reset_empty")
-                
-        if (not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")) or (sel_obj is None):
-            O_CopyBonecol.enabled=False
-            col.label(text="先选择骨架才能操作")
-        elif not context.scene.fdk_config_json_data:
-            O_CopyBonecol.enabled=False
-            col.label(text="先导入JSON才能操作")
                         
         # if context.scene.fdk_config_json_data:
             # col.prop(context.scene, "fdk_source_armature", text="源骨架", icon="ARMATURE_DATA")
@@ -1140,6 +1177,7 @@ def register():
     bpy.utils.register_class(O_RenameBone)
     bpy.utils.register_class(O_CopyBone)
     bpy.utils.register_class(O_compare_Armatures)
+    bpy.utils.register_class(O_copy_Armatures)
     bpy.utils.register_class(O_AddEmpty)
     bpy.utils.register_class(O_RenameByJSON)
     
@@ -1210,6 +1248,7 @@ def unregister():
     bpy.utils.unregister_class(O_RenameBone)
     bpy.utils.unregister_class(O_CopyBone)
     bpy.utils.unregister_class(O_compare_Armatures)
+    bpy.utils.unregister_class(O_copy_Armatures)
     bpy.utils.unregister_class(O_AddEmpty)
     bpy.utils.unregister_class(O_RenameByJSON)
     
