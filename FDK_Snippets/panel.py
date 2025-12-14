@@ -1,5 +1,5 @@
 import bpy,os,json
-import mathutils,math,numpy
+import mathutils,math,numpy,copy
 from bpy_extras.io_utils import ImportHelper
 from mathutils import Vector,Quaternion
 ########################## Divider ##########################
@@ -65,11 +65,14 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
                     fdk_config_json_data=json.load(file)
                     context.scene["fdk_config_json_data"]=json.dumps(fdk_config_json_data)
                 self.report({'INFO'}, f"JSON文件已导入({encoding}): {json_file}")
+                if "change_matrix" in fdk_config_json_data:
+                    context.scene.change_matrix = fdk_config_json_data["change_matrix"]
+                    self.report({'INFO'}, f"change_matrix={context.scene.change_matrix}")
                 if "change_tail" in fdk_config_json_data:
                     context.scene.change_tail = fdk_config_json_data["change_tail"]
                     self.report({'INFO'}, f"change_tail={context.scene.change_tail}")
                 if "reset_empty" in fdk_config_json_data:
-                    context.scene.change_tail = fdk_config_json_data["reset_empty"]
+                    context.scene.reset_empty = fdk_config_json_data["reset_empty"]
                     self.report({'INFO'}, f"reset_empty={context.scene.reset_empty}")
                 warning = ""
                 keys = ["CopyBone_arr_base","CopyBone_arr_names",
@@ -350,10 +353,9 @@ class O_CopyBone(bpy.types.Operator):
                 changes=mathutils.Vector((b.head[0]-b_child.head[0],
                     b.head[1]-b_child.head[1],
                     b.head[2]-b_child.head[2]))
+                #_console.report({'INFO'}, f"changes: {changes}")
                 if changetail == True:
-                    b.tail = [b.tail[0]-b.head[0]+b_child.head[0],
-                        b.tail[1]-b.head[1]+b_child.head[1],
-                        b.tail[2]-b.head[2]+b_child.head[2]]
+                    b.tail = b.tail-changes
                 else:
                     b.tail = b_child.tail
                 b.head = b_child.head
@@ -405,11 +407,11 @@ class O_CopyBone(bpy.types.Operator):
         except:
             context.scene["change_matrix"]=False
         try:
-            changematrix=context.scene["reset_empty"]
+            resetempty=context.scene["reset_empty"]
         except:
             context.scene["reset_empty"]=True
         try:
-            changematrix=context.scene["change_tail"]
+            changetail=context.scene["change_tail"]
         except:
             context.scene["change_tail"]=True
                 
@@ -660,6 +662,88 @@ class O_remove_Empty_Bone(bpy.types.Operator):
         self.report({'INFO'},f"O_remove_Empty_Bone finished")
         return {'FINISHED'}
 ########################## Divider ##########################
+class O_copy_Bone_Pos(bpy.types.Operator):
+    bl_idname = "fdktools.copy_bonepos"
+    bl_label = "复制骨节位置"
+    bl_description = "在编辑模式选中两段骨节复制位置"
+    def execute(self, context):
+        if not bpy.context.object.mode == 'EDIT':
+            self.report({'ERROR'},f"必须是编辑模式")
+            return {'CANCELLED'}
+        if not len(bpy.context.selected_editable_bones) ==2:
+            self.report({'ERROR'},f"必须选中两段骨节")
+            return {'CANCELLED'}
+        arm = bpy.data.objects.get(bpy.context.active_object.name).data
+        b1=bpy.context.active_bone
+        for b in bpy.context.selected_editable_bones:
+            if b.name != b1.name:
+                b0=b
+        #create backup
+        b = arm.edit_bones.new(b1.name+'_move_backup')
+        b.head = b1.head
+        b.tail = b1.tail
+        b.matrix = b1.matrix
+        if not b1.parent == None:
+            b.parent = b1.parent
+        changes=b0.head - b1.head
+        b1.tail = b1.tail+changes
+        b1.head = b1.head+changes
+        self.report({'INFO'},f"copy_bonepos finished")
+        return {'FINISHED'}
+class O_copy_Bone_Pos2(bpy.types.Operator):
+    bl_idname = "fdktools.copy_bonepos2"
+    bl_label = "复制骨节位置2"
+    bl_description = "在编辑模式选中两段骨节复制位置，不移动尾端"
+    def execute(self, context):
+        if not bpy.context.object.mode == 'EDIT':
+            self.report({'ERROR'},f"必须是编辑模式")
+            return {'CANCELLED'}
+        if not len(bpy.context.selected_editable_bones) ==2:
+            self.report({'ERROR'},f"必须选中两段骨节")
+            return {'CANCELLED'}
+        arm = bpy.data.objects.get(bpy.context.active_object.name).data
+        b1=bpy.context.active_bone
+        for b in bpy.context.selected_editable_bones:
+            if b.name != b1.name:
+                b0=b
+        #create backup
+        b = arm.edit_bones.new(b1.name+'_backup')
+        b.head = b1.head
+        b.tail = b1.tail
+        b.matrix = b1.matrix
+        if not b1.parent == None:
+            b.parent = b1.parent
+        changes=b0.head - b1.head
+        b1.head=b1.head+changes
+        self.report({'INFO'},f"copy_bonepos2 finished")
+        return {'FINISHED'}
+class O_copy_Bone_Pos3(bpy.types.Operator):
+    bl_idname = "fdktools.copy_bonepos3"
+    bl_label = "复制骨节位置3"
+    bl_description = "在编辑模式选中两段骨节复制位置，复制matrix"
+    def execute(self, context):
+        if not bpy.context.object.mode == 'EDIT':
+            self.report({'ERROR'},f"必须是编辑模式")
+            return {'CANCELLED'}
+        if not len(bpy.context.selected_editable_bones) ==2:
+            self.report({'ERROR'},f"必须选中两段骨节")
+            return {'CANCELLED'}
+        arm = bpy.data.objects.get(bpy.context.active_object.name).data
+        b1=bpy.context.active_bone
+        for b in bpy.context.selected_editable_bones:
+            if b.name != b1.name:
+                b0=b
+        #create backup
+        b = arm.edit_bones.new(b1.name+'_backup')
+        b.head = b1.head
+        b.tail = b1.tail
+        b.matrix = b1.matrix
+        if not b1.parent == None:
+            b.parent = b1.parent
+        b1.matrix = b0.matrix
+        self.report({'INFO'},f"copy_bonepos3 finished")
+        return {'FINISHED'}
+########################## Divider ##########################
 class O_copy_Armatures(bpy.types.Operator):
     bl_idname = "fdktools.copy_arms"
     bl_label = "补充结构"
@@ -689,6 +773,139 @@ class O_copy_Armatures(bpy.types.Operator):
                 arm.edit_bones[child.name].parent=b_orig
         bpy.ops.object.mode_set(mode='OBJECT')
         self.report({'INFO'},f"O_copy_Armatures finished")
+        return {'FINISHED'}
+########################## Divider ##########################
+class O_attach_Armatures(bpy.types.Operator):
+    bl_idname = "fdktools.attach_bones"
+    bl_label = "Attach"
+    bl_description = "添加到选中骨骼做子级"
+    
+    #https://stackoverflow.com/questions/2556108/rreplace-how-to-replace-the-last-occurrence-of-an-expression-in-a-string
+    def rreplace(s, old, new, occurrence):
+        li = s.rsplit(old, occurrence)
+        return new.join(li)
+    
+    def execute(self, context):
+        #bpy.ops.transform.translate(value=(0, 0, 1), orient_type='GLOBAL')
+        #put cursor at origin 
+        try:
+            bpy.context.scene.cursor.location = Vector((0.0, 0.0, 0.0))
+            bpy.context.scene.cursor.rotation_euler = Vector((0.0, 0.0, 0.0))
+            with bpy.context.temp_override(selected_editable_objects=bpy.context.selected_objects):
+                bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+        except Exception as e: self.report({'INFO'}, f"{e}")
+            
+        arm = bpy.data.objects.get(bpy.context.active_object.name).data
+        arm0=None
+        for obj in bpy.context.selected_objects:
+            if obj.type=="ARMATURE" and obj.name != bpy.context.active_object.name:
+                obj0=obj
+                arm0=obj0.data
+                
+        #bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+        bpy.ops.object.mode_set(mode='EDIT')
+        for bone in arm0.edit_bones:
+            bone.select = False
+            bone.select_head = False
+            bone.select_tail = False
+        if len(bpy.context.selected_bones)==0:
+            parentname = O_attach_Armatures.rreplace(arm0.name, '_m', '', 1)
+            if parentname in arm.edit_bones:
+                parent = arm.edit_bones[parentname]
+            else:
+                self.report({'INFO'},f"没选择骨节")
+                return {'CANCELLED'}
+        else:
+            parent = bpy.context.selected_bones[0]
+        if parent is None:
+            self.report({'INFO'},f"没选择骨节")
+            return {'CANCELLED'}
+        else:
+            self.report({'INFO'},f"父级：{parent.name}")
+        
+        for b_orig in arm0.edit_bones:
+            self.report({'INFO'},f"createing {b_orig.name}")
+            b = arm.edit_bones.new(b_orig.name)
+            b.head = b_orig.head
+            b.tail = b_orig.tail
+            b.matrix = b_orig.matrix
+            if b_orig.parent is None:
+                b.parent = parent
+            else:
+                b.parent = arm.edit_bones[b_orig.parent.name]
+            
+        bpy.ops.object.mode_set(mode='OBJECT')
+        self.report({'INFO'},f"O_attach_Armatures finished")
+        return {'FINISHED'}
+########################## Divider ##########################
+class O_attach_Armatures2(bpy.types.Operator):
+    bl_idname = "fdktools.attach_bones2"
+    bl_label = "Attach2"
+    bl_description = "添加到选中骨骼做子级"
+    
+    def execute(self, context):
+        #bpy.ops.transform.translate(value=(0, 0, 1), orient_type='GLOBAL')
+        #put cursor at origin 
+        obj1= bpy.data.objects.get(bpy.context.active_object.name)
+        arm = obj1.data
+        for obj in bpy.context.selected_objects:
+            if obj.type=="ARMATURE" and obj.name != obj1.name:
+                obj0=obj
+                arm0= obj0.data
+                location0=copy.deepcopy(obj0.location)
+        
+        try:
+            bpy.context.scene.cursor.location = Vector((0.0, 0.0, 0.0))
+            bpy.context.scene.cursor.rotation_euler = Vector((0.0, 0.0, 0.0))
+            with bpy.context.temp_override(selected_editable_objects=bpy.context.selected_objects):
+                bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+        except Exception as e: self.report({'INFO'}, f"{e}")
+        
+        bpy.ops.object.mode_set(mode='EDIT')
+        for bone in arm0.edit_bones:
+            bone.select = False
+            bone.select_head = False
+            bone.select_tail = False
+        if len(bpy.context.selected_bones)==0:
+            parentname = O_attach_Armatures.rreplace(arm0.name, '_m', '', 1)
+            if parentname in arm.edit_bones:
+                parent = arm.edit_bones[parentname]
+            else:
+                self.report({'INFO'},f"没选择骨节；没找到{parentname}")
+                return {'CANCELLED'}
+        else:
+            parent = bpy.context.selected_bones[0]
+        if parent is None:
+            self.report({'INFO'},f"没选择骨节")
+            return {'CANCELLED'}
+        else:
+            self.report({'INFO'},f"父级：{parent.name}")
+            
+        b1 = arm.edit_bones.new(obj0.name)
+        b1.head=parent.head-location0
+        b1.tail=b1.head+(parent.tail-parent.head)
+        b1.parent=parent
+        
+        # b2 = arm.edit_bones.new(obj0.name+"_a")
+        # b2.head=parent.tail-location0
+        # b2.tail=b2.head+(parent.tail-parent.head)
+        # b2.parent=parent
+        
+        parent=b1
+        
+        for b_orig in arm0.edit_bones:
+            self.report({'INFO'},f"createing {b_orig.name}")
+            b = arm.edit_bones.new(b_orig.name)
+            b.head = b_orig.head
+            b.tail = b_orig.tail
+            b.matrix = b_orig.matrix
+            if b_orig.parent is None:
+                b.parent = parent
+            else:
+                b.parent = arm.edit_bones[b_orig.parent.name]
+            
+        bpy.ops.object.mode_set(mode='OBJECT')
+        self.report({'INFO'},f"O_attach_Armatures2 finished")
         return {'FINISHED'}
 ########################## Divider ##########################
 class O_compare_Armatures(bpy.types.Operator):
@@ -909,6 +1126,108 @@ class O_join_Meshes(bpy.types.Operator):
         self.report({'INFO'},f"O_join_Meshes finished")
         return {'FINISHED'}
 ########################## Divider ##########################
+class O_renameMaterial(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.rename_material_png"
+    bl_label = "贴图后缀名改成png"
+    bl_description = "贴图后缀名改成png并重选来源文件夹"
+    
+    directory: bpy.props.StringProperty(
+        name="Outdir Path",
+        description="Where I will save my stuff"
+        # subtype='DIR_PATH' is not needed to specify the selection mode.
+        # But this will be anyway a directory path.
+        )
+    filter_folder: bpy.props.BoolProperty(
+        default=True,
+        options={"HIDDEN"}
+        )
+    
+    def execute(self, context):
+        # ref:https://blender.stackexchange.com/questions/331452/change-fbx-model-texture-path-to-read-png-instead-of-jpg-texture-images/331460#331460
+        for img in bpy.data.images:
+            if img.source == 'FILE' and not img.is_dirty and not img.library:
+                imgpath = os.path.basename(img.filepath_raw)
+                img.filepath_raw = f"{os.path.splitext(imgpath)[0]}.png"
+        # 指定查找丢失数据的路径
+        # self.report({'INFO'},f"{self.directory}")
+        directory = self.directory
+        # 查找丢失数据
+        bpy.ops.file.find_missing_files(directory=directory)
+        # 自动打开文件
+        # bpy.ops.file.find_missing_files(open=True)
+        remapped_imgs = []
+        for img in bpy.data.images:
+            if img.source == 'FILE' and not img.is_dirty and not img.library:
+                if os.path.exists(os.path.abspath(bpy.path.abspath(img.filepath_raw))):
+                    remapped_imgs.append(img)
+        for mat in bpy.data.materials:
+            if mat.node_tree:
+                pbr_nodes = [
+                    node for node in mat.node_tree.nodes
+                    if node.type == 'BSDF_PRINCIPLED'
+                ]
+                if len(pbr_nodes) == 1:
+                    img_nodes = [
+                        node for node in mat.node_tree.nodes
+                        if node.type == 'TEX_IMAGE' and node.image and node.image in remapped_imgs
+                    ]
+                    for img_node in img_nodes:
+                        if not img_node.outputs['Alpha'].is_linked:
+                            mat.node_tree.links.new(img_node.outputs['Alpha'], pbr_nodes[0].inputs['Alpha'])
+        self.report({'INFO'},f"rename_material_png finished")
+        return {'FINISHED'}
+########################## Divider ##########################
+class O_renameMaterialdds(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.rename_material_dds"
+    bl_label = "贴图后缀名改成dds"
+    bl_description = "贴图后缀名改成dds并重选来源文件夹"
+    
+    directory: bpy.props.StringProperty(
+        name="Outdir Path",
+        description="Where I will save my stuff"
+        # subtype='DIR_PATH' is not needed to specify the selection mode.
+        # But this will be anyway a directory path.
+        )
+    filter_folder: bpy.props.BoolProperty(
+        default=True,
+        options={"HIDDEN"}
+        )
+    
+    def execute(self, context):
+        # ref:https://blender.stackexchange.com/questions/331452/change-fbx-model-texture-path-to-read-png-instead-of-jpg-texture-images/331460#331460
+        for img in bpy.data.images:
+            if img.source == 'FILE' and not img.is_dirty and not img.library:
+                imgpath = os.path.basename(img.filepath_raw)
+                img.filepath_raw = f"{os.path.splitext(imgpath)[0]}.dds"
+        # 指定查找丢失数据的路径
+        # self.report({'INFO'},f"{self.directory}")
+        directory = self.directory
+        # 查找丢失数据
+        bpy.ops.file.find_missing_files(directory=directory)
+        # 自动打开文件
+        # bpy.ops.file.find_missing_files(open=True)
+        remapped_imgs = []
+        for img in bpy.data.images:
+            if img.source == 'FILE' and not img.is_dirty and not img.library:
+                if os.path.exists(os.path.abspath(bpy.path.abspath(img.filepath_raw))):
+                    remapped_imgs.append(img)
+        for mat in bpy.data.materials:
+            if mat.node_tree:
+                pbr_nodes = [
+                    node for node in mat.node_tree.nodes
+                    if node.type == 'BSDF_PRINCIPLED'
+                ]
+                if len(pbr_nodes) == 1:
+                    img_nodes = [
+                        node for node in mat.node_tree.nodes
+                        if node.type == 'TEX_IMAGE' and node.image and node.image in remapped_imgs
+                    ]
+                    for img_node in img_nodes:
+                        if not img_node.outputs['Alpha'].is_linked:
+                            mat.node_tree.links.new(img_node.outputs['Alpha'], pbr_nodes[0].inputs['Alpha'])
+        self.report({'INFO'},f"rename_material_dds finished")
+        return {'FINISHED'}
+########################## Divider ##########################
 class O_get_MaterialName(bpy.types.Operator):
     bl_idname = "fdktools.get_material_images"
     bl_label = "复制贴图参数"
@@ -1013,7 +1332,9 @@ class P_FDK_Snippets(bpy.types.Panel):
         O_CopyBonerow = col.row(align=True)
         O_CopyBonerow.operator(O_compare_Armatures.bl_idname, text=O_compare_Armatures.bl_label, icon="COPYDOWN")#对比骨架
         O_CopyBonerow.operator(O_copy_Armatures.bl_idname, text=O_copy_Armatures.bl_label, icon="COPYDOWN")#复制结构
-        
+        O_CopyBonerow = col.row(align=True)
+        O_CopyBonerow.operator(O_attach_Armatures.bl_idname, text=O_attach_Armatures.bl_label, icon="ARMATURE_DATA")
+        O_CopyBonerow.operator(O_attach_Armatures2.bl_idname, text=O_attach_Armatures2.bl_label, icon="ARMATURE_DATA")
         col.enabled = (not sel_obj is None) and (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")
         
         # row = O_CopyBonecol.row(align=True)
@@ -1126,6 +1447,12 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
             child_row.enabled = False
         child_row.operator(O_remove_Empty_Bone.bl_idname, text=O_remove_Empty_Bone.bl_label, icon="BONE_DATA")
         child_row.operator(O_get_Names_By_Armature.bl_idname, text=O_get_Names_By_Armature.bl_label, icon="COPYDOWN")
+        child_row = col.row(align=True)
+        if not (bpy.context.object.mode == 'EDIT' and len(bpy.context.selected_editable_bones) ==2):
+            child_row.enabled = False
+        child_row.operator(O_copy_Bone_Pos.bl_idname, text=O_copy_Bone_Pos.bl_label, icon="COPYDOWN")
+        child_row.operator(O_copy_Bone_Pos2.bl_idname, text=O_copy_Bone_Pos2.bl_label, icon="COPYDOWN")
+        child_row.operator(O_copy_Bone_Pos3.bl_idname, text=O_copy_Bone_Pos3.bl_label, icon="COPYDOWN")
 
         box = layout.box()
         col = box.column(align=True)
@@ -1162,6 +1489,11 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
             O_get_MaterialNamecol.enabled=False
         O_get_MaterialNamecol.operator(O_get_MaterialName.bl_idname, text=O_get_MaterialName.bl_label,icon="COPYDOWN")
         
+        col = box.column(align=True)
+        row = col.row(align=True)
+        row.operator(O_renameMaterial.bl_idname, text=O_renameMaterial.bl_label)
+        row.operator(O_renameMaterialdds.bl_idname, text=O_renameMaterialdds.bl_label)
+        
         # col.prop(context.scene, "fdk_source_mesh", text="源网格", icon="MESH_DATA")
         # col.prop(context.scene, "fdk_target_mesh", text="目标网格", icon="MESH_DATA")
         # col.operator(O_join_Meshes.bl_idname, text=O_join_Meshes.bl_label, icon="MESH_DATA")
@@ -1178,6 +1510,8 @@ def register():
     bpy.utils.register_class(O_CopyBone)
     bpy.utils.register_class(O_compare_Armatures)
     bpy.utils.register_class(O_copy_Armatures)
+    bpy.utils.register_class(O_attach_Armatures)
+    bpy.utils.register_class(O_attach_Armatures2)
     bpy.utils.register_class(O_AddEmpty)
     bpy.utils.register_class(O_RenameByJSON)
     
@@ -1191,7 +1525,12 @@ def register():
     bpy.utils.register_class(O_join_Meshes)
     bpy.utils.register_class(O_get_MaterialName)
     bpy.utils.register_class(O_get_Names_By_Armature)
+    bpy.utils.register_class(O_copy_Bone_Pos)
+    bpy.utils.register_class(O_copy_Bone_Pos2)
+    bpy.utils.register_class(O_copy_Bone_Pos3)
     bpy.utils.register_class(O_remove_Empty_Bone)
+    bpy.utils.register_class(O_renameMaterial)
+    bpy.utils.register_class(O_renameMaterialdds)
     
     bpy.utils.register_class(P_FDK_Snippets)
     bpy.utils.register_class(P_FDK_Snippets_Target)
@@ -1249,6 +1588,8 @@ def unregister():
     bpy.utils.unregister_class(O_CopyBone)
     bpy.utils.unregister_class(O_compare_Armatures)
     bpy.utils.unregister_class(O_copy_Armatures)
+    bpy.utils.unregister_class(O_attach_Armatures)
+    bpy.utils.unregister_class(O_attach_Armatures2)
     bpy.utils.unregister_class(O_AddEmpty)
     bpy.utils.unregister_class(O_RenameByJSON)
     
@@ -1262,11 +1603,16 @@ def unregister():
     bpy.utils.unregister_class(O_join_Meshes)
     bpy.utils.unregister_class(O_get_MaterialName)
     bpy.utils.unregister_class(O_get_Names_By_Armature)
+    bpy.utils.unregister_class(O_copy_Bone_Pos)
+    bpy.utils.unregister_class(O_copy_Bone_Pos2)
+    bpy.utils.unregister_class(O_copy_Bone_Pos3)
     bpy.utils.unregister_class(O_remove_Empty_Bone)
     
     bpy.utils.unregister_class(P_FDK_Snippets)
     bpy.utils.unregister_class(P_FDK_Snippets_Target)
     bpy.utils.unregister_class(P_FDK_Snippets_Others)
+    bpy.utils.unregister_class(O_renameMaterial)
+    bpy.utils.unregister_class(O_renameMaterialdds)
 
     del bpy.types.Scene.fdk_config_json_data
     del bpy.types.Scene.fdk_rename_pair_json_data

@@ -1,0 +1,76 @@
+{
+    "root":"Root",
+    
+    "lowerbody_jo":"Hips",
+
+    "sthigh_l_ex_lo_ac":"LeftUpLeg",
+    "sthigh_r_ex_lo_ac":"RightUpLeg",
+    "leg_l":"LeftLeg",
+    "leg_r":"RightLeg",
+    "sthigh_l_b_ex_wj":"LeftUpLegRoll",
+    "sthigh_r_b_ex_wj":"RightUpLegRoll",
+    "foot_l":"LeftFoot",
+    "toe_l":"LeftToe",
+    "foot_r":"RightFoot",
+    "toe_r":"RightToe",
+
+    "upperbody_jo":"Spine1",
+    "waist":"Spine2",
+
+    "chest":"chest",
+
+    "neck":"Neck",
+    "head":"Head",
+
+    "shoulder_l_jo":"LeftShoulder",
+    "arm_l":"LeftArm",
+    "forearm_l":"LeftForeArm",
+    "wrist_l":"LeftHand",
+    "index_a_l":"LeftHandIndex1",
+    "index_b_l":"LeftHandIndex2",
+    "index_c_l":"LeftHandIndex3",
+    "middle_a_l":"LeftHandMiddle1",
+    "middle_b_l":"LeftHandMiddle2",
+    "middle_c_l":"LeftHandMiddle3",
+
+    "pinky_l_jo":"pinky_l_jo",
+
+    "pinky_a_l_jo":"LeftHandPinky1",
+    "pinky_b_l":"LeftHandPinky2",
+    "pinky_c_l":"LeftHandPinky3",
+    
+    "ring_l":"ring_l",
+    
+    "ring_a_l":"LeftHandRing1",
+    "ring_b_l":"LeftHandRing2",
+    "ring_c_l":"LeftHandRing3",
+    "thumb_l_jo":"LeftHandThumb1",
+    "thumb_a_l_jo":"LeftHandThumb2",
+    "thumb_b_l":"LeftHandThumb3",
+
+    "shoulder_r_jo":"RightShoulder",
+    "arm_r":"RightArm",
+    "forearm_r":"RightForeArm",
+    "wrist_r":"RightHand",
+    "index_a_r":"RightHandIndex1",
+    "index_b_r":"RightHandIndex2",
+    "index_c_r":"RightHandIndex3",
+    "middle_a_r":"RightHandMiddle1",
+    "middle_b_r":"RightHandMiddle2",
+    "middle_c_r":"RightHandMiddle3",
+
+    "pinky_r_jo":"pinky_r_jo",
+
+    "pinky_a_r_jo":"RightHandPinky1",
+    "pinky_b_r":"RightHandPinky2",
+    "pinky_c_r":"RightHandPinky3",
+    
+    "ring_r":"ring_r",
+    
+    "ring_a_r":"RightHandRing1",
+    "ring_b_r":"RightHandRing2",
+    "ring_c_r":"RightHandRing3",
+    "thumb_r_jo":"RightHandThumb1",
+    "thumb_a_r_jo":"RightHandThumb2",
+    "thumb_b_r":"RightHandThumb3"
+}

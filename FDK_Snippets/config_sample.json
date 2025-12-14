@@ -2,7 +2,8 @@
     "Headkey": "Head",
     "RenameBone_prefix": "_New",
     "RenameBone_orig_prefix": "_Orig",
-    "change_tail":false,
+    "change_tail":true,
+    "change_matrix":false,
     "reset_empty":false,
     "RenameBone_arr_copy": {
         "desc": "重命名脸部-复制一份原名骨骼以应对定位",
@@ -27,23 +28,37 @@
         ],
         "comments": []
     },
-    "CopyBone_arr_base": {
-        "desc": "复制位置-用于复制骨骼定位，遍历所有子元素",
+    "RenameBone_arr_ignore": {
+        "desc": "",
         "data": [
+        ],
+        "comments": []
+    },
+    "RemoveBone_arr_shouldKeep": {
+        "desc": "",
+        "data": [
+        ],
+        "comments": []
+    },
+    "CopyBone_arr_base": {
+        "desc": "复制位置-用于复制骨骼定位，会读取所有子骨骼复制其位置，如不存在会添加该子骨骼",
+        "data": [
+            "LeftShoulder",
+            "RightShoulder"
         ],
         "comments": [
             "LeftShoulder",
             "RightShoulder",
-            "Spine1",
+            "Hips",
             "Head"
         ]
     },
     "CopyBone_arr_names": {
-        "desc": "复制位置-用于复制骨骼定位，但不处理子元素",
+        "desc": "复制位置-用于复制特定骨骼定位。不会继续读取子骨骼",
         "data": [
-            "Root"
         ],
         "comments": [
+            "Root",
             "D:\\mod\\Ys8_IT3-main\\c0000",
             "root",
             "Null_ALL",
@@ -78,9 +93,9 @@
     "CopyBone_arr_add_ignore": {
         "desc": "复制位置-提供父骨骼添加缺失子骨骼时，要忽略的名称",
         "data": [
-            "Bone_eye_root"
         ],
         "comments": [
+            "Bone_eye_root",
             "Head"
         ]
     },
