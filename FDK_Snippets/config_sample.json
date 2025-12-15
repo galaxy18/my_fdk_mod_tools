@@ -44,7 +44,8 @@
         "desc": "复制位置-用于复制骨骼定位，会读取所有子骨骼复制其位置，如不存在会添加该子骨骼",
         "data": [
             "LeftShoulder",
-            "RightShoulder"
+            "RightShoulder",
+            "Hips"
         ],
         "comments": [
             "LeftShoulder",
