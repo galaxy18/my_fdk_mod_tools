@@ -73,6 +73,6 @@
     "foot_r":"RightFoot",
     "toe_r":"RightToe",
     
-    "missing_LeftHipRoll":"LeftHipRoll",
-    "missing_RightHipRoll":"RightHipRoll"
+    "hip_l_ex":"LeftHipRoll",
+    "hip_r_ex":"RightHipRoll"
 }
