@@ -41,6 +41,38 @@ class O_ImportRenameJSON(bpy.types.Operator, ImportHelper):
         self.report({'ERROR'}, "无法解码JSON文件，请尝试转换为UTF-8编码")
         return {'CANCELLED'}
 ########################## Divider ##########################
+class O_ImportMovingJSON(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.json_moving_import"
+    bl_label = "选择重组配对JSON"
+    bl_description = "导入窗口右上角选择编码格式"
+    filename_ext = ".json"
+    filter_glob: bpy.props.StringProperty(
+        default="*.json",
+        options={'HIDDEN'},
+    )
+    
+    def execute(self, context):
+        json_file = self.filepath
+        if not json_file or not os.path.exists(json_file):
+            self.report({'ERROR'}, "请选择有效的JSON文件")
+            return {'CANCELLED'}
+        # 尝试的编码顺序
+        encodings = ['utf-8', 'gbk', 'utf-16']
+        for encoding in encodings:
+            try:
+                with open(json_file, 'r', newline='', encoding=encoding) as file:
+                    fdk_moving_pair_json_data=json.load(file)
+                    context.scene["fdk_moving_pair_json_data"]=json.dumps(fdk_moving_pair_json_data)
+                self.report({'INFO'}, f"JSON文件已导入({encoding}): {json_file}")
+                return {'FINISHED'}
+            except UnicodeDecodeError:
+                continue
+            except Exception as e:
+                self.report({'ERROR'}, f"导入JSON文件时出现错误: {e}")
+                return {'CANCELLED'}
+        self.report({'ERROR'}, "无法解码JSON文件，请尝试转换为UTF-8编码")
+        return {'CANCELLED'}
+########################## Divider ##########################
 class O_ImportJSON(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.json_import"
     bl_label = "选择配置JSON"
@@ -492,6 +524,50 @@ class O_RenameByJSON(bpy.types.Operator):
             idx+=1
             
         self.report({'INFO'},f"O_RenameByJSON finished")
+        return {'FINISHED'}
+########################## Divider ##########################
+class O_MoveByJSON(bpy.types.Operator):
+    bl_idname = "fdktools.move_by_json"
+    bl_label = "根据JSON重组"
+    bl_description = "根据JSON修改目标骨架父子级关系"
+    
+    def execute(self, context):
+        if not "fdk_moving_pair_json_data" in context.scene or context.scene["fdk_moving_pair_json_data"] == "":
+            self.report({'ERROR'}, "没有选择配置文件") 
+            return {'FINISHED'}
+        moving_pair=json.loads(context.scene["fdk_moving_pair_json_data"])
+        bpy.ops.object.mode_set(mode='EDIT')
+        arm=bpy.data.objects.get(bpy.context.active_object.name).data
+        if not 'dummy' in arm.edit_bones:
+            dummy = arm.edit_bones.new('dummy')
+            dummy.tail.z=1
+        if not 'world' in arm.edit_bones:
+            world = arm.edit_bones.new('world')
+            world.tail.z=1
+        if not 'ChrExport' in arm.edit_bones:
+            ChrExport = arm.edit_bones.new('ChrExport')
+            ChrExport.tail.z=1
+            if 'root' in arm.edit_bones:
+                ChrExport.tail = arm.edit_bones['root'].head
+        if not 'Up_Point' in arm.edit_bones:
+            Up_Point = arm.edit_bones.new('Up_Point')
+            Up_Point.parent = ChrExport
+            if 'upperbody_jo' in arm.edit_bones:
+                Up_Point.tail = arm.edit_bones['upperbody_jo'].tail
+            if 'root' in arm.edit_bones:
+                arm.edit_bones['root'].parent = Up_Point
+        
+        for pair in moving_pair:
+            if pair[0] in arm.edit_bones:
+                if pair[1] in arm.edit_bones:
+                    arm.edit_bones[pair[0]].parent=arm.edit_bones[pair[1]]
+                else:
+                    self.report({'INFO'},f"parent {pair[1]} not found")
+            else:
+                self.report({'INFO'},f"child {pair[0]} not found")
+            
+        bpy.ops.object.mode_set(mode='OBJECT')
+        self.report({'INFO'},f"O_MoveByJSON finished")
         return {'FINISHED'}
 ########################## Divider ##########################
 class O_hideEmpty(bpy.types.Operator):
@@ -1332,10 +1408,6 @@ class P_FDK_Snippets(bpy.types.Panel):
         O_CopyBonerow = col.row(align=True)
         O_CopyBonerow.operator(O_compare_Armatures.bl_idname, text=O_compare_Armatures.bl_label, icon="COPYDOWN")#对比骨架
         O_CopyBonerow.operator(O_copy_Armatures.bl_idname, text=O_copy_Armatures.bl_label, icon="COPYDOWN")#复制结构
-        O_CopyBonerow = col.row(align=True)
-        O_CopyBonerow.operator(O_attach_Armatures.bl_idname, text=O_attach_Armatures.bl_label, icon="ARMATURE_DATA")
-        O_CopyBonerow.operator(O_attach_Armatures2.bl_idname, text=O_attach_Armatures2.bl_label, icon="ARMATURE_DATA")
-        col.enabled = (not sel_obj is None) and (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")
         
         # row = O_CopyBonecol.row(align=True)
         # row.prop(context.scene, "change_matrix", text="copy_matrix")
@@ -1415,6 +1487,67 @@ class P_FDK_Snippets_Target(bpy.types.Panel):
             O_RenameByJSONcol.enabled = False
         O_RenameByJSONcol.operator(O_RenameByJSON.bl_idname, text=O_RenameByJSON.bl_label, icon="BONE_DATA")
 
+class P_FDK_Snippets_FGOA(bpy.types.Panel):
+    bl_idname = "FDK_Snippets_FGOA"
+    bl_label = "FGOA用"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'FDK_Snippets'
+    bl_options = {'DEFAULT_CLOSED'} #默认折叠
+    
+    @classmethod
+    def poll(cls, context):
+        return True #context.scene.active_fdktools_subpanel == 'BoneTools'
+    def draw(self, context):
+        layout = self.layout
+        
+        box = layout.box()
+        col = box.column(align=True)
+        
+        sel_obj=None
+        if bpy.context.active_object and bpy.context.active_object.type=="MESH":
+            if len(bpy.context.selected_objects)>0:
+                for obj in bpy.context.selected_objects:
+                    if obj.type=="MESH" and obj.name != bpy.context.active_object.name:
+                        sel_obj=obj
+                if sel_obj:
+                    row = col.row(align=True)
+                    row.label(text="源网格：")
+                    row.label(text=sel_obj.name)
+                else:
+                    col.label(text="选择源网格才能合并")
+        
+        
+        O_CopyBonerow = col.row(align=True)
+        O_CopyBonerow.operator(O_attach_Armatures.bl_idname, text=O_attach_Armatures.bl_label, icon="ARMATURE_DATA")
+        O_CopyBonerow.operator(O_attach_Armatures2.bl_idname, text=O_attach_Armatures2.bl_label, icon="ARMATURE_DATA")
+        col.enabled = (not sel_obj is None) and (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")
+        
+        child_row = col.row(align=True)
+        if not (bpy.context.object.mode == 'EDIT' and len(bpy.context.selected_editable_bones) ==2):
+            child_row.enabled = False
+        child_row.operator(O_copy_Bone_Pos.bl_idname, text=O_copy_Bone_Pos.bl_label, icon="COPYDOWN")
+        child_row.operator(O_copy_Bone_Pos2.bl_idname, text=O_copy_Bone_Pos2.bl_label, icon="COPYDOWN")
+        child_row.operator(O_copy_Bone_Pos3.bl_idname, text=O_copy_Bone_Pos3.bl_label, icon="COPYDOWN")
+        
+        box = layout.box()
+        col = box.column(align=True)
+        col.label(text="依照json重组目标骨架")
+        if not context.scene.fdk_moving_pair_json_data:
+            col.operator(O_ImportMovingJSON.bl_idname, icon="IMPORT")#重命名配对JSON
+        else:
+            col.operator(O_ImportMovingJSON.bl_idname, icon="IMPORT", text="重选配对JSON")
+        O_RenameByJSONcol = box.column(align=True)
+        if (not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")) or (not context.scene.fdk_moving_pair_json_data):
+            O_RenameByJSONcol.enabled = False
+        O_RenameByJSONcol.operator(O_MoveByJSON.bl_idname, text=O_MoveByJSON.bl_label, icon="BONE_DATA")
+        
+        box = layout.box()
+        col = box.column(align=True)
+        row = col.row(align=True)
+        row.operator(O_renameMaterial.bl_idname, text=O_renameMaterial.bl_label)
+        row.operator(O_renameMaterialdds.bl_idname, text=O_renameMaterialdds.bl_label)
+        
 class P_FDK_Snippets_Others(bpy.types.Panel):
     bl_idname = "FDK_Snippets_Others"
     bl_label = "其他快捷操作"
@@ -1447,12 +1580,6 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
             child_row.enabled = False
         child_row.operator(O_remove_Empty_Bone.bl_idname, text=O_remove_Empty_Bone.bl_label, icon="BONE_DATA")
         child_row.operator(O_get_Names_By_Armature.bl_idname, text=O_get_Names_By_Armature.bl_label, icon="COPYDOWN")
-        child_row = col.row(align=True)
-        if not (bpy.context.object.mode == 'EDIT' and len(bpy.context.selected_editable_bones) ==2):
-            child_row.enabled = False
-        child_row.operator(O_copy_Bone_Pos.bl_idname, text=O_copy_Bone_Pos.bl_label, icon="COPYDOWN")
-        child_row.operator(O_copy_Bone_Pos2.bl_idname, text=O_copy_Bone_Pos2.bl_label, icon="COPYDOWN")
-        child_row.operator(O_copy_Bone_Pos3.bl_idname, text=O_copy_Bone_Pos3.bl_label, icon="COPYDOWN")
 
         box = layout.box()
         col = box.column(align=True)
@@ -1489,11 +1616,6 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
             O_get_MaterialNamecol.enabled=False
         O_get_MaterialNamecol.operator(O_get_MaterialName.bl_idname, text=O_get_MaterialName.bl_label,icon="COPYDOWN")
         
-        col = box.column(align=True)
-        row = col.row(align=True)
-        row.operator(O_renameMaterial.bl_idname, text=O_renameMaterial.bl_label)
-        row.operator(O_renameMaterialdds.bl_idname, text=O_renameMaterialdds.bl_label)
-        
         # col.prop(context.scene, "fdk_source_mesh", text="源网格", icon="MESH_DATA")
         # col.prop(context.scene, "fdk_target_mesh", text="目标网格", icon="MESH_DATA")
         # col.operator(O_join_Meshes.bl_idname, text=O_join_Meshes.bl_label, icon="MESH_DATA")
@@ -1502,6 +1624,7 @@ def register():
     # bpy.utils.register_class(O_AssignArmature)
     bpy.utils.register_class(O_ImportJSON)
     bpy.utils.register_class(O_ImportRenameJSON)
+    bpy.utils.register_class(O_ImportMovingJSON)
     bpy.utils.register_class(O_DelBone)
     bpy.utils.register_class(O_DelOtherBone)
     bpy.utils.register_class(O_select_Meshes_By_Armature)
@@ -1514,6 +1637,7 @@ def register():
     bpy.utils.register_class(O_attach_Armatures2)
     bpy.utils.register_class(O_AddEmpty)
     bpy.utils.register_class(O_RenameByJSON)
+    bpy.utils.register_class(O_MoveByJSON)
     
     bpy.utils.register_class(O_hideEmpty)
     bpy.utils.register_class(O_showEmpty)
@@ -1534,6 +1658,7 @@ def register():
     
     bpy.utils.register_class(P_FDK_Snippets)
     bpy.utils.register_class(P_FDK_Snippets_Target)
+    bpy.utils.register_class(P_FDK_Snippets_FGOA)
     bpy.utils.register_class(P_FDK_Snippets_Others)
     
     bpy.types.Scene.fdk_config_json_data = bpy.props.StringProperty(
@@ -1541,6 +1666,9 @@ def register():
     )
     bpy.types.Scene.fdk_rename_pair_json_data = bpy.props.StringProperty(
         name="Rename JSON Data",description="重命名配对数据",default=""
+    )
+    bpy.types.Scene.fdk_moving_pair_json_data = bpy.props.StringProperty(
+        name="Rename JSON Data",description="重组配对数据",default=""
     )
     # bpy.types.Scene.fdk_source_armature = bpy.props.PointerProperty(
         # description="选择一个骨架作为数据源",type=bpy.types.Object,poll=ObjType.is_armature
@@ -1580,6 +1708,7 @@ def unregister():
     # bpy.utils.unregister_class(O_AssignArmature)
     bpy.utils.unregister_class(O_ImportJSON)
     bpy.utils.unregister_class(O_ImportRenameJSON)
+    bpy.utils.unregister_class(O_ImportMovingJSON)
     bpy.utils.unregister_class(O_DelBone)
     bpy.utils.unregister_class(O_DelOtherBone)
     bpy.utils.unregister_class(O_select_Meshes_By_Armature)
@@ -1592,6 +1721,7 @@ def unregister():
     bpy.utils.unregister_class(O_attach_Armatures2)
     bpy.utils.unregister_class(O_AddEmpty)
     bpy.utils.unregister_class(O_RenameByJSON)
+    bpy.utils.unregister_class(O_MoveByJSON)
     
     bpy.utils.unregister_class(O_hideEmpty)
     bpy.utils.unregister_class(O_showEmpty)
@@ -1610,12 +1740,14 @@ def unregister():
     
     bpy.utils.unregister_class(P_FDK_Snippets)
     bpy.utils.unregister_class(P_FDK_Snippets_Target)
+    bpy.utils.unregister_class(P_FDK_Snippets_FGOA)
     bpy.utils.unregister_class(P_FDK_Snippets_Others)
     bpy.utils.unregister_class(O_renameMaterial)
     bpy.utils.unregister_class(O_renameMaterialdds)
 
     del bpy.types.Scene.fdk_config_json_data
     del bpy.types.Scene.fdk_rename_pair_json_data
+    del bpy.types.Scene.fdk_moving_pair_json_data
     # del bpy.types.Scene.fdk_source_armature
     # del bpy.types.Scene.fdk_target_armature
     # del bpy.types.Scene.fdk_source_mesh
