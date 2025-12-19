@@ -47,7 +47,8 @@
             "RightShoulder",
             "Hips",
             "chest_m",
-            "head_m"
+            "head_m",
+            "upperbody_jo_m"
         ],
         "comments": [
             "LeftShoulder",
