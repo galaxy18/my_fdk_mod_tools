@@ -43,7 +43,7 @@ class O_ImportRenameJSON(bpy.types.Operator, ImportHelper):
 ########################## Divider ##########################
 class O_ImportMovingJSON(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.json_moving_import"
-    bl_label = "选择重组配对JSON"
+    bl_label = "选择重组配置JSON"
     bl_description = "导入窗口右上角选择编码格式"
     filename_ext = ".json"
     filter_glob: bpy.props.StringProperty(
@@ -97,15 +97,16 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
                     fdk_config_json_data=json.load(file)
                     context.scene["fdk_config_json_data"]=json.dumps(fdk_config_json_data)
                 self.report({'INFO'}, f"JSON文件已导入({encoding}): {json_file}")
-                if "change_matrix" in fdk_config_json_data:
-                    context.scene.change_matrix = fdk_config_json_data["change_matrix"]
-                    self.report({'INFO'}, f"change_matrix={context.scene.change_matrix}")
-                if "change_tail" in fdk_config_json_data:
-                    context.scene.change_tail = fdk_config_json_data["change_tail"]
-                    self.report({'INFO'}, f"change_tail={context.scene.change_tail}")
-                if "reset_empty" in fdk_config_json_data:
-                    context.scene.reset_empty = fdk_config_json_data["reset_empty"]
-                    self.report({'INFO'}, f"reset_empty={context.scene.reset_empty}")
+                if "CopyBone_arr_base" in fdk_config_json_data:
+                    if "change_tail" in fdk_config_json_data["CopyBone_arr_base"]:
+                        context.scene.change_tail = fdk_config_json_data["CopyBone_arr_base"]["change_tail"]
+                        self.report({'INFO'}, f"change_tail={context.scene.change_tail}")
+                    if "change_matrix" in fdk_config_json_data["CopyBone_arr_base"]:
+                        context.scene.change_matrix = fdk_config_json_data["CopyBone_arr_base"]["change_matrix"]
+                        self.report({'INFO'}, f"change_matrix={context.scene.change_matrix}")
+                    if "reset_empty" in fdk_config_json_data["CopyBone_arr_base"]:
+                        context.scene.reset_empty = fdk_config_json_data["CopyBone_arr_base"]["reset_empty"]
+                        self.report({'INFO'}, f"reset_empty={context.scene.reset_empty}")
                 warning = ""
                 keys = ["CopyBone_arr_base","CopyBone_arr_names",
                     "CopyBone_arr_ignore","CopyBone_arr_add",
@@ -121,14 +122,18 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
                     f"但缺少{warning}字段；建议检查JSON文件后重新导入")
                 else:
                     self.report({'INFO'}, f"JSON文件已导入({encoding}): {json_file}")
-                    if "Headkey" in fdk_config_json_data and (not fdk_config_json_data["Headkey"]==""):
-                        context.scene.fdk_modify_headname=fdk_config_json_data["Headkey"]
-                    if "RenameBone_prefix" in fdk_config_json_data and (not fdk_config_json_data["RenameBone_prefix"]==""):
-                        context.scene.fdk_rename_prefix=fdk_config_json_data["RenameBone_prefix"]
-                    # if "RenameBone_copy_prefix" in fdk_config_json_data:
-                        # context.scene.fdk_rename_copy_prefix=fdk_config_json_data["RenameBone_copy_prefix"]
-                    if "RenameBone_orig_prefix" in fdk_config_json_data and (not fdk_config_json_data["RenameBone_orig_prefix"]==""):
-                        context.scene.fdk_rename_orig_prefix=fdk_config_json_data["RenameBone_orig_prefix"]
+                    if "RenameBone_arr_copy" in fdk_config_json_data:
+                        if "Headkey" in fdk_config_json_data["RenameBone_arr_copy"] \
+                            and (not fdk_config_json_data["RenameBone_arr_copy"]["Headkey"]==""):
+                            context.scene.fdk_modify_headname=fdk_config_json_data["RenameBone_arr_copy"]["Headkey"]
+                        if "RenameBone_prefix" in fdk_config_json_data["RenameBone_arr_copy"] \
+                            and (not fdk_config_json_data["RenameBone_arr_copy"]["RenameBone_prefix"]==""):
+                            context.scene.fdk_rename_prefix=fdk_config_json_data["RenameBone_arr_copy"]["RenameBone_prefix"]
+                        # if "RenameBone_copy_prefix" in fdk_config_json_data["RenameBone_arr_copy"]:
+                            # context.scene.fdk_rename_copy_prefix=fdk_config_json_data["RenameBone_arr_copy"]["RenameBone_copy_prefix"]
+                        if "RenameBone_orig_prefix" in fdk_config_json_data["RenameBone_arr_copy"] \
+                            and (not fdk_config_json_data["RenameBone_arr_copy"]["RenameBone_orig_prefix"]==""):
+                            context.scene.fdk_rename_orig_prefix=fdk_config_json_data["RenameBone_arr_copy"]["RenameBone_orig_prefix"]
                 return {'FINISHED'}
             except UnicodeDecodeError:
                 continue
@@ -693,7 +698,20 @@ class O_del_glTF_not(bpy.types.Operator):
 class O_remove_Empty_Bone(bpy.types.Operator):
     bl_idname = "fdktools.remove_bone_by_meshes"
     bl_label = "⚠清理骨骼"
-    bl_description = "（实验功能）删除无顶点组的骨骼"
+    bl_description = "（实验功能）删除无顶点组的骨骼；会忽略RemoveBone_arr_shouldKeep中的名称和_Point结尾的名称"
+    
+    def process(arm,bone,bones,arr_shouldkeep):
+        if (not bone.name in bones) or (bone.name in arr_shouldkeep) or (bone.name.endswith("_Point")):
+            return False
+        else:
+            shouldremove = True
+            for child in bone.children:
+                shouldremove = shouldremove and O_remove_Empty_Bone.process(arm,child,bones,arr_shouldkeep)
+            if shouldremove:
+                bone.select = True
+                bone.select_head = True
+                bone.select_tail = True
+            return shouldremove
     
     def execute(self, context):
         bpy.context.window_manager.clipboard=""
@@ -709,7 +727,9 @@ class O_remove_Empty_Bone(bpy.types.Operator):
             arr_shouldkeep=json.loads(context.scene["fdk_config_json_data"])["RemoveBone_arr_shouldKeep"]["data"]
         except:
             arr_shouldkeep=[]
+        remove_no_child_only = json.loads(context.scene["fdk_config_json_data"])["RemoveBone_arr_shouldKeep"]["remove_no_child_only"]==True
         
+        self.report({'INFO'},f"O_remove_Empty_Bone collecting...")
         for obj in bpy.data.objects:
             if obj.type=="MESH" and (not obj.parent is None) and obj.parent.name == baseobj.name:
                 meshes.append(obj)
@@ -723,16 +743,20 @@ class O_remove_Empty_Bone(bpy.types.Operator):
         bpy.context.view_layer.objects.active = baseobj
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.armature.select_all(action='DESELECT')
-        self.report({'INFO'},f"O_remove_Empty_Bone collecting...")
+        self.report({'INFO'},f"O_remove_Empty_Bone collect done")
+        self.report({'INFO'},f"O_remove_Empty_Bone remove_no_child_only={remove_no_child_only}")
         for bone in arm.edit_bones:
-            if bone.name in bones:
-                if bone.name in arr_shouldkeep:
-                    self.report({'INFO'},f"{bone.name} keeped")
-                else:
-                    bone.select = True
-                    bone.select_head = True
-                    bone.select_tail = True
-                    self.report({'INFO'},f"{bone.name} removed")
+            if remove_no_child_only:
+                O_remove_Empty_Bone.process(arm,bone,bones,arr_shouldkeep)
+            else:
+                if bone.name in bones:
+                    if (bone.name in arr_shouldkeep) or bone.name.endswith("_Point"):
+                        self.report({'INFO'},f"{bone.name} keeped")
+                    else:
+                        bone.select = True
+                        bone.select_head = True
+                        bone.select_tail = True
+                        self.report({'INFO'},f"{bone.name} selected")
         bpy.ops.armature.delete()
         bpy.ops.object.mode_set(mode='OBJECT')
         self.report({'INFO'},f"O_remove_Empty_Bone finished")

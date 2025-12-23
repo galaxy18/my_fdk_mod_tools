@@ -1,10 +1,4 @@
 {
-    "Headkey": "Head",
-    "RenameBone_prefix": "_New",
-    "RenameBone_orig_prefix": "_Orig",
-    "change_tail":true,
-    "change_matrix":false,
-    "reset_empty":false,
     "RenameBone_arr_copy": {
         "desc": "重命名脸部-复制一份原名骨骼以应对定位",
         "data": [
@@ -17,6 +11,9 @@
             "L_highlight",
             "L_Highlight"
         ],
+        "Headkey": "Head",
+        "RenameBone_prefix": "_New",
+        "RenameBone_orig_prefix": "_Orig",
         "comments": [
             "Face_Root"
         ]
@@ -34,14 +31,11 @@
         ],
         "comments": []
     },
-    "RemoveBone_arr_shouldKeep": {
-        "desc": "",
-        "data": [
-        ],
-        "comments": []
-    },
     "CopyBone_arr_base": {
         "desc": "复制位置-用于复制骨骼定位，会读取所有子骨骼复制其位置，如不存在会添加该子骨骼",
+        "change_tail":true,
+        "change_matrix":false,
+        "reset_empty":false,
         "data": [
             "LeftShoulder",
             "RightShoulder",
@@ -105,6 +99,28 @@
             "Bone_eye_root",
             "Head"
         ]
+    },
+    "RemoveBone_arr_shouldKeep": {
+        "desc": "",
+        "data": [
+            "world",
+            "ChrExport",
+            "Up_Point",
+            "root",
+            "Root",
+            "Spine1",
+            "Spine2",
+            "RightArm_Point",
+            "RightHand_Point",
+            "LeftArm_Point",
+            "LeftHand_Point",
+            "LeftWeaponRot_Point",
+            "LeftWeapon_Point",
+            "RightWeaponRot_Point",
+            "RightWeapon_Point"
+        ],
+        "remove_no_child_only":true,
+        "comments": []
     },
     "AddEmpty_arr_addPoint": {
         "desc": "添加空物体",

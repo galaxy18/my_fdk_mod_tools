@@ -2,6 +2,7 @@
 	["upperbody_jo_m","upperbody_jo"],
 	["head_m","head"],
 	["chest_m","chest"],
+	["waist_m","waist"],
     
 	["sforearm_l_a_wj","forearm_l"],
 	["sarm_l_c_ex_wj","arm_l"],
@@ -15,7 +16,7 @@
 	["sarm_r_c_ex_wj","arm_r"],
 	["sarm_r_b_ex_wj","sarm_r_c_ex_wj"],
 	["sarm_r_a_wj","sarm_r_b_ex_wj"],
-	["sarm_r_ro_ac","sarm_r_a_wj"],
+	["sarm_r_lo_ac","sarm_r_a_wj"],
 	["sarm_r_d_ex_wj","arm_r"],
 	["elbow_r_a_ex_wj","sarm_r_d_ex_wj"],
     
@@ -35,12 +36,17 @@
 	["sthigh_r_c_ex_wj","sthigh_r_a_wj"],
 	["knee_a_r_ex_wj","leg_r"],
     
-    ["arm_l_m","arm_l"],
+    ["arm_l_m","dummy"],
     ["forearm_l_m","forearm_l"],
     ["shoulder_l_jo_m","shoulder_l_jo"],
-    ["arm_r_m","arm_r"],
+    ["arm_r_m","dummy"],
     ["forearm_r_m","forearm_r"],
     ["shoulder_r_jo_m","shoulder_r_jo"],
+    
+    ["shoulder_A_l_m","shoulder_l_jo"],
+    ["shoulder_B_l_m","shoulder_l_jo"],
+    ["shoulder_A_r_m","shoulder_r_jo"],
+    ["shoulder_B_r_m","shoulder_r_jo"],
     
     ["thigh_l","dummy"],
     ["hip_l","dummy"],
