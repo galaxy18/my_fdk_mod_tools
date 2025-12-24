@@ -398,7 +398,8 @@ class O_CopyBone(bpy.types.Operator):
                 b.head = b_child.head
                 if changematrix==True:
                     b.matrix = b_child.matrix
-                #b.parent = b_child.parent
+                if not b_child.parent is None:
+                    b.parent = b_child.parent
             if resetempty == True:
                 for obj in bpy.data.objects:
                     if obj.parent_type=='BONE' and obj.parent_bone == b_child.name and obj.type == "EMPTY":
@@ -1407,7 +1408,8 @@ class P_FDK_Snippets(bpy.types.Panel):
         sel_obj=None
         if len(bpy.context.selected_objects)>0:
             for obj in bpy.context.selected_objects:
-                if obj.type=="ARMATURE" and obj.name != bpy.context.active_object.name:
+                if obj.type=="ARMATURE" and (not obj is None) and (not bpy.context.active_object is None)\
+                    and obj.name != bpy.context.active_object.name:
                     sel_obj=obj
 
         row = col.row(align=True)

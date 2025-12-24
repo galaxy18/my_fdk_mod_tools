@@ -54,9 +54,7 @@
     "CopyBone_arr_names": {
         "desc": "复制位置-用于复制特定骨骼定位。不会继续读取子骨骼",
         "data": [
-            "chest",
-            "chest_m",
-            "head_m"
+            "chest"
         ],
         "comments": [
             "Root",
@@ -101,7 +99,7 @@
         ]
     },
     "RemoveBone_arr_shouldKeep": {
-        "desc": "",
+        "desc": "移除无对应顶点组骨骼。名字以_Point结尾的会自动保留。remove_no_child_only为true的时候，如果还有子级没被移除，父级就不会被移除。",
         "data": [
             "world",
             "ChrExport",
@@ -130,6 +128,30 @@
                 "",
                 "BONE",
                 "Head"
+            ],
+            [
+                "LeftArm_Point",
+                "",
+                "BONE",
+                "LeftHand"
+            ],
+            [
+                "LeftHand_Point",
+                "LeftArm_Point",
+                "OBJECT",
+                ""
+            ],
+            [
+                "RightArm_Point",
+                "",
+                "BONE",
+                "RightHand"
+            ],
+            [
+                "RightHand_Point",
+                "RightArm_Point",
+                "OBJECT",
+                ""
             ],
             [
                 "LeftWeaponRot_Point",
