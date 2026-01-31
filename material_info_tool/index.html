@@ -523,6 +523,10 @@ function processglobaldef(globalkey){
 		$.each(Object.keys(shader_defs),function(index2,key2){
 			var _value=shader_defs[key2];
 			var shader_hash=_value['shader_name']+'#'+_value['shader_switches_hash_referenceonly'];
+            if(_value['charaids']==null&&_value['charaid']!=null){
+                _value['charaids']=_value['charaid'];
+                delete _value['charaid'];
+            }
 			var _node = $('<div>',{'style':'display:flex;margin:0.2em;padding:0.5em;border:1px solid #DBDBDB;box-sizing:border-box;justify-content:space-between;user-select:none;cursor:pointer;','draggable':'true'})
 			.append(key2+'\t('+_value['charaids'][0]+')').data('charaids',_value['charaids']).on("dragstart", function(event){
 				dragged_shader = shader_hash;

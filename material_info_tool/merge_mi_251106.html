@@ -435,9 +435,9 @@ function processreffile(file){
 		</div>
         <div style="display:flex;align-items:center;justify-content:center;">
             <div id="togglepanel" class="actionbtn"
-            onclick="$('#rightpanel').toggle();$(this).html($('#rightpanel').is(':visible')?'>':'<');">></div>
+            onclick="$('#rightpanel').toggle();$(this).toggleClass('hide');"></div>
         </div>
-		<div id="rightpanel" style="flex: 1 1 40%;box-sizing:border-box;border:1px solid darkred;margin-left:0.2em;display:flex;flex-direction:column;">
+		<div id="rightpanel" style="flex: 1 1 40%;box-sizing:border-box;border:1px solid darkred;display:flex;flex-direction:column;">
 			<div style="flex:1 1 auto;display:flex;flex-direction:column;overflow:auto;" id="refdoc"></div>
 			<!-- <div style="display:flex;justify-content:flex-end;margin:0.2em;">过滤：<input type="text" id="filterref" /></div> -->
 		</div>
@@ -553,9 +553,19 @@ loadstorage();
 #refdoc .refnode{
 	display:flex;
 }
+#togglepanel{
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+}
+#togglepanel:after{
+    content:'>隐藏右侧版面>';
+}
+#togglepanel.hide:after{
+    content:'<显示右侧版面<';
+}
 .actionbtn{
     min-width:1em;
-    height:1em;
+    min-height:1em;
     border:1px solid lightpink;
     cursor:pointer;
     display:inline-flex;
