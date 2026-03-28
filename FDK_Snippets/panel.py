@@ -2,6 +2,192 @@ import bpy,os,json
 import mathutils,math,numpy,copy
 from bpy_extras.io_utils import ImportHelper
 from mathutils import Vector,Quaternion
+from .KuroMDLTools import kuro_mdl_to_basic_gltf, kuro_mdl_import_meshes, kuro_mdl_export_meshes, kuro_gltf_to_meshes
+from .io_scene_gltf2.blender.imp.blender_gltf import BlenderGlTF
+from .io_scene_gltf2.io.imp.gltf2_io_gltf import glTFImporter
+from .io_scene_gltf2.io.com.gltf2_io import Gltf, gltf_from_dict
+########################## Divider ##########################
+class O_ConvertMDL(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.mdl_convert"
+    bl_label = "MDL to GLB+BIN"
+    bl_description = "v1.6.5"
+    filename_ext = ".mdl"
+    filter_glob: bpy.props.StringProperty(
+        default="*.mdl",
+        options={'HIDDEN'},
+    )
+    
+    def execute(self, context):
+        mdl_file = self.filepath
+        if not mdl_file or not os.path.exists(mdl_file):
+            self.report({'ERROR'}, "请选择mdl文件")
+            return {'CANCELLED'}
+            
+        self.report({'INFO'}, f"Processing {mdl_file}")
+        with open(mdl_file, "rb") as f:
+            mdl_data = f.read()
+        kuro_mdl_to_basic_gltf.process_mdl(mdl_file, mdl_data, True, False, False, True, True)
+        return {'FINISHED'}
+########################## Divider ##########################
+class O_ExportMDLJson(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.mdl_export_json"
+    bl_label = "MDL export JSON"
+    bl_description = "v1.6.5"
+    filename_ext = ".mdl"
+    filter_glob: bpy.props.StringProperty(
+        default="*.mdl",
+        options={'HIDDEN'},
+    )
+    
+    def execute(self, context):
+        mdl_file = self.filepath
+        if not mdl_file or not os.path.exists(mdl_file):
+            self.report({'ERROR'}, "请选择mdl文件")
+            return {'CANCELLED'}
+            
+        self.report({'INFO'}, f"Processing {mdl_file}")
+        with open(mdl_file, "rb") as f:
+            mdl_data = f.read()
+        kuro_mdl_export_meshes.process_mdl(mdl_file, mdl_data, True, False, False, True, True)
+        return {'FINISHED'}
+########################## Divider ##########################
+class O_ExportMDL(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.mdl_export"
+    bl_label = "MDL to VBIB+JSON"
+    bl_description = "v1.6.5"
+    filename_ext = ".mdl"
+    filter_glob: bpy.props.StringProperty(
+        default="*.mdl",
+        options={'HIDDEN'},
+    )
+    
+    def execute(self, context):
+        mdl_file = self.filepath
+        if not mdl_file or not os.path.exists(mdl_file):
+            self.report({'ERROR'}, "请选择mdl文件")
+            return {'CANCELLED'}
+            
+        self.report({'INFO'}, f"Processing {mdl_file}")
+        with open(mdl_file, "rb") as f:
+            mdl_data = f.read()
+        kuro_mdl_export_meshes.process_mdl(mdl_file, mdl_data, True, False, False, True)
+        return {'FINISHED'}
+########################## Divider ##########################
+class O_ImportMDL(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.mdl_import"
+    bl_label = "Import MDL as GLB"
+    bl_description = "v1.6.5"
+    filename_ext = ".mdl"
+    filter_glob: bpy.props.StringProperty(
+        default="*.mdl",
+        options={'HIDDEN'},
+    )
+    
+    def execute(self, context):
+        usedds=context.scene.usedds
+        mdl_file = self.filepath
+        if not mdl_file or not os.path.exists(mdl_file):
+            self.report({'ERROR'}, "请选择mdl文件")
+            return {'CANCELLED'}
+            
+        self.report({'INFO'}, f"Processing {mdl_file}")
+        with open(mdl_file, "rb") as f:
+            mdl_data = f.read()
+        gltf_data, giant_buffer = kuro_mdl_to_basic_gltf.process_mdl(mdl_file, mdl_data, True, False, False, True, False, usedds)
+        
+        import_settings = self.as_keywords()
+        user_extensions = []
+        import sys
+        preferences = bpy.context.preferences
+        for addon_name in preferences.addons.keys():
+            try:
+                module = sys.modules[addon_name]
+            except Exception:
+                continue
+            if hasattr(module, 'glTF2ImportUserExtension'):
+                extension_ctor = module.glTF2ImportUserExtension
+                user_extensions.append(extension_ctor())
+        import_settings['import_user_extensions'] = user_extensions
+        import_settings['import_shading'] = "NORMALS"
+        
+        import_settings['merge_vertices'] = True
+        import_settings['import_merge_material_slots'] = True
+        
+        import_settings['import_pack_images'] = True
+        import_settings['import_webp_texture'] = False
+        import_settings['import_unused_materials'] = False
+        
+        import_settings['bone_heuristic'] = "BLENDER"
+        import_settings['guess_original_bind_pose'] = True
+        import_settings['disable_bone_shape'] = False
+        import_settings['bone_shape_scale_factor'] = 1.0
+        
+        import_settings['import_scene_as_collection'] = True
+        import_settings['import_select_created_objects'] = True
+        import_settings['import_scene_extras'] = True
+        
+        gltf_importer=glTFImporter(mdl_file, import_settings)
+        gltf_importer.data=gltf_from_dict(gltf_data)
+        #self.report({'INFO'}, f"debug: {gltf_importer.data.nodes}")
+        gltf_importer.glb_buffer=giant_buffer
+        BlenderGlTF.create(gltf_importer)
+        
+        return {'FINISHED'}
+########################## Divider ##########################
+class O_GltfToMeshes(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.gltf_to_meshes"
+    bl_label = "GLTF to Meshes"
+    bl_description = "v1.6.5"
+    filename_ext = ".glb"
+    filter_glob: bpy.props.StringProperty(
+        default="*.glb;*.gltf",
+        options={'HIDDEN'},
+    )
+    
+    def execute(self, context):
+        mdl_file = self.filepath
+        if not mdl_file or not os.path.exists(mdl_file):
+            self.report({'ERROR'}, "请选择glb/gltf文件")
+            return {'CANCELLED'}
+        #encodings = ['utf-8', 'gbk', 'utf-16']
+        try:
+            self.report({'INFO'}, f"{mdl_file}")
+            kuro_gltf_to_meshes.process_gltf(mdl_file, True, True)
+            #with open(json_file, 'r', newline='', encoding=encoding) as file:
+            return {'FINISHED'}
+        except Exception as e:
+            self.report({'ERROR'}, f"导入JSON文件时出现错误1: {e}")
+            return {'CANCELLED'}
+        return {'CANCELLED'}
+########################## Divider ##########################
+class O_UpdateMDL(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.mdl_import_vbib"
+    bl_label = "Import VBIB to MDL"
+    bl_description = "v1.6.5"
+    filename_ext = ".mdl"
+    filter_glob: bpy.props.StringProperty(
+        default="*.mdl",
+        options={'HIDDEN'},
+    )
+    
+    def execute(self, context):
+        nobak=context.scene.do_not_backup
+        mdl_file = self.filepath
+        if not mdl_file or not os.path.exists(mdl_file):
+            self.report({'ERROR'}, "请选择mdl文件")
+            return {'CANCELLED'}
+        #encodings = ['utf-8', 'gbk', 'utf-16']
+        try:
+            self.report({'INFO'}, f"{mdl_file}")
+            with open(mdl_file, "rb") as f:
+                mdl_data = f.read()
+            kuro_mdl_import_meshes.process_mdl(mdl_file, mdl_data, False, 1, nobak)
+            #with open(json_file, 'r', newline='', encoding=encoding) as file:
+            return {'FINISHED'}
+        except Exception as e:
+            self.report({'ERROR'}, f"导入JSON文件时出现错误1: {e}")
+            return {'CANCELLED'}
+        return {'CANCELLED'}
 ########################## Divider ##########################
 class ObjType(bpy.types.Operator):
     def is_mesh(scene, obj):
@@ -1374,9 +1560,9 @@ class O_get_MaterialName(bpy.types.Operator):
         bpy.context.window_manager.clipboard=delimiter.join(result)
         self.report({'INFO'},f"O_get_MaterialName finished")
         return {'FINISHED'}
-########################## Divider ##########################
-class P_FDK_Snippets(bpy.types.Panel):
-    bl_idname = "FDK_Snippets"
+########################## Divider ##########################   
+class FDK_PT_Snippets(bpy.types.Panel):
+    bl_idname = "FDK_PT_Snippets"
     bl_label = "全局配置"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -1408,8 +1594,7 @@ class P_FDK_Snippets(bpy.types.Panel):
         sel_obj=None
         if len(bpy.context.selected_objects)>0:
             for obj in bpy.context.selected_objects:
-                if obj.type=="ARMATURE" and (not obj is None) and (not bpy.context.active_object is None)\
-                    and obj.name != bpy.context.active_object.name:
+                if obj.type=="ARMATURE" and obj.name != bpy.context.active_object.name:
                     sel_obj=obj
 
         row = col.row(align=True)
@@ -1439,7 +1624,7 @@ class P_FDK_Snippets(bpy.types.Panel):
         # row.prop(context.scene, "change_matrix", text="copy_matrix")
         # row.prop(context.scene, "change_tail", text="copy_tail")
         # row.prop(context.scene, "reset_empty", text="reset_empty")
-                        
+        
         # if context.scene.fdk_config_json_data:
             # col.prop(context.scene, "fdk_source_armature", text="源骨架", icon="ARMATURE_DATA")
             # if context.scene.fdk_source_armature:
@@ -1451,8 +1636,8 @@ class P_FDK_Snippets(bpy.types.Panel):
             # col = box.column()
             # col.label(text="先导入JSON才能复制位置")
 
-class P_FDK_Snippets_Target(bpy.types.Panel):
-    bl_idname = "FDK_Snippets_Target"
+class FDK_PT_Snippets_Target(bpy.types.Panel):
+    bl_idname = "FDK_PT_Snippets_Target"
     bl_label = "编辑目标骨架"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -1513,8 +1698,8 @@ class P_FDK_Snippets_Target(bpy.types.Panel):
             O_RenameByJSONcol.enabled = False
         O_RenameByJSONcol.operator(O_RenameByJSON.bl_idname, text=O_RenameByJSON.bl_label, icon="BONE_DATA")
 
-class P_FDK_Snippets_FGOA(bpy.types.Panel):
-    bl_idname = "FDK_Snippets_FGOA"
+class FDK_PT_Snippets_FGOA(bpy.types.Panel):
+    bl_idname = "FDK_PT_Snippets_FGOA"
     bl_label = "FGOA用"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -1574,8 +1759,8 @@ class P_FDK_Snippets_FGOA(bpy.types.Panel):
         row.operator(O_renameMaterial.bl_idname, text=O_renameMaterial.bl_label)
         row.operator(O_renameMaterialdds.bl_idname, text=O_renameMaterialdds.bl_label)
         
-class P_FDK_Snippets_Others(bpy.types.Panel):
-    bl_idname = "FDK_Snippets_Others"
+class FDK_PT_Snippets_Others(bpy.types.Panel):
+    bl_idname = "FDK_PT_Snippets_Others"
     bl_label = "其他快捷操作"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -1641,6 +1826,31 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
         if not (bpy.context.active_object and (bpy.context.active_object.type=="MESH" or bpy.context.active_object.type=="ARMATURE")):
             O_get_MaterialNamecol.enabled=False
         O_get_MaterialNamecol.operator(O_get_MaterialName.bl_idname, text=O_get_MaterialName.bl_label,icon="COPYDOWN")
+
+class FDK_PT_Snippets_IO(bpy.types.Panel):
+    bl_idname = "FDK_PT_Snippets_IO"
+    bl_label = "I/O"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'FDK_Snippets'
+    
+    @classmethod
+    def poll(cls, context):
+        return True #context.scene.active_fdktools_subpanel == 'BoneTools'
+    def draw(self, context):
+        layout = self.layout
+        box = layout.box()
+        col = box.column(align=True)
+        col.operator(O_ImportMDL.bl_idname, icon="IMPORT")#Import MDL
+        col.prop(context.scene, "usedds", text="贴图后缀使用dds")
+        col.operator(O_ExportMDLJson.bl_idname, icon="IMPORT")#MDL export JSON
+        col = box.column(align=True)
+        col.operator(O_UpdateMDL.bl_idname, icon="IMPORT")#Import VBIB to MDL
+        col.prop(context.scene, "do_not_backup", text="不创建bak")
+        col = box.column(align=True)
+        col.operator(O_ExportMDL.bl_idname, icon="IMPORT")#MDL to VBIB
+        col.operator(O_ConvertMDL.bl_idname, icon="IMPORT")#MDL to GLB+BIN
+        col.operator(O_GltfToMeshes.bl_idname, icon="IMPORT")#GLTF to Meshes
         
         # col.prop(context.scene, "fdk_source_mesh", text="源网格", icon="MESH_DATA")
         # col.prop(context.scene, "fdk_target_mesh", text="目标网格", icon="MESH_DATA")
@@ -1648,6 +1858,13 @@ class P_FDK_Snippets_Others(bpy.types.Panel):
 ########################## Divider ##########################
 def register():
     # bpy.utils.register_class(O_AssignArmature)
+    bpy.utils.register_class(O_ConvertMDL)
+    bpy.utils.register_class(O_ExportMDL)
+    bpy.utils.register_class(O_ExportMDLJson)
+    bpy.utils.register_class(O_GltfToMeshes)
+    bpy.utils.register_class(O_ImportMDL)
+    bpy.utils.register_class(O_UpdateMDL)
+    
     bpy.utils.register_class(O_ImportJSON)
     bpy.utils.register_class(O_ImportRenameJSON)
     bpy.utils.register_class(O_ImportMovingJSON)
@@ -1682,10 +1899,11 @@ def register():
     bpy.utils.register_class(O_renameMaterial)
     bpy.utils.register_class(O_renameMaterialdds)
     
-    bpy.utils.register_class(P_FDK_Snippets)
-    bpy.utils.register_class(P_FDK_Snippets_Target)
-    bpy.utils.register_class(P_FDK_Snippets_FGOA)
-    bpy.utils.register_class(P_FDK_Snippets_Others)
+    bpy.utils.register_class(FDK_PT_Snippets)
+    bpy.utils.register_class(FDK_PT_Snippets_Target)
+    bpy.utils.register_class(FDK_PT_Snippets_FGOA)
+    bpy.utils.register_class(FDK_PT_Snippets_Others)
+    bpy.utils.register_class(FDK_PT_Snippets_IO)
     
     bpy.types.Scene.fdk_config_json_data = bpy.props.StringProperty(
         name="Config JSON Data",description="配置数据",default=""
@@ -1729,9 +1947,22 @@ def register():
     bpy.types.Scene.reset_empty = bpy.props.BoolProperty(
         name="reset empty",description="(实验功能)",default= True
     )
+    bpy.types.Scene.do_not_backup = bpy.props.BoolProperty(
+        name="donot backup",description="导入时不创建bak",default= True
+    )
+    bpy.types.Scene.usedds = bpy.props.BoolProperty(
+        name="use dds",description="改用dds",default= True
+    )
 
 def unregister():
     # bpy.utils.unregister_class(O_AssignArmature)
+    bpy.utils.unregister_class(O_ConvertMDL)
+    bpy.utils.unregister_class(O_ExportMDL)
+    bpy.utils.unregister_class(O_ExportMDLJson)
+    bpy.utils.unregister_class(O_GltfToMeshes)
+    bpy.utils.unregister_class(O_ImportMDL)
+    bpy.utils.unregister_class(O_UpdateMDL)
+    
     bpy.utils.unregister_class(O_ImportJSON)
     bpy.utils.unregister_class(O_ImportRenameJSON)
     bpy.utils.unregister_class(O_ImportMovingJSON)
@@ -1764,10 +1995,11 @@ def unregister():
     bpy.utils.unregister_class(O_copy_Bone_Pos3)
     bpy.utils.unregister_class(O_remove_Empty_Bone)
     
-    bpy.utils.unregister_class(P_FDK_Snippets)
-    bpy.utils.unregister_class(P_FDK_Snippets_Target)
-    bpy.utils.unregister_class(P_FDK_Snippets_FGOA)
-    bpy.utils.unregister_class(P_FDK_Snippets_Others)
+    bpy.utils.unregister_class(FDK_PT_Snippets)
+    bpy.utils.unregister_class(FDK_PT_Snippets_Target)
+    bpy.utils.unregister_class(FDK_PT_Snippets_FGOA)
+    bpy.utils.unregister_class(FDK_PT_Snippets_Others)
+    bpy.utils.unregister_class(FDK_PT_Snippets_IO)
     bpy.utils.unregister_class(O_renameMaterial)
     bpy.utils.unregister_class(O_renameMaterialdds)
 
@@ -1786,3 +2018,5 @@ def unregister():
     del bpy.types.Scene.change_matrix
     del bpy.types.Scene.change_tail
     del bpy.types.Scene.reset_empty
+    del bpy.types.Scene.do_not_backup
+    del bpy.types.Scene.usedds

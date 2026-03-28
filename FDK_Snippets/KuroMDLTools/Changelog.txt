@@ -1,0 +1,142 @@
+v1.6.5
+- kuro_mdl_to_basic_gltf.py will now skip generating mesh nodes if an .mdl mesh has zero submeshes and no collision mesh (which only occurs when exporting previously modded .mdl files).
+- kuro_gltf_to_meshes.py will now attempt to detect when Blender has auto-generated duplicate materials from complex models (usually maps), and offer to switch the material back to the original.
+
+v1.6.4
+- Implemented the following fixes for texture mapping in kuro_mdl_to_basic_gltf.py:
+    - Correctly identify and use the correct UV maps for textures (primarily affects normal texture)
+    - Apply bottom-up texture reading to all textures, not just the first texture
+    - Add transparent texture support (alpha mask and alpha blend modes)
+    - Add ambient occlusion map support
+    - Add double-sided material support
+
+v1.6.3
+- kuro_mdl_to_basic_gltf.py will now rename duplicate nodes so that all nodes will have a unique identifier (required by Blender).
+- kuro_decode_bin_json.py will now remove trailing zero decimals from whole numbers (required by Trails beyond the Horizon).
+
+v1.6.2
+- Fix syntax error for invalid escape sequence with Python 3.13.
+- Add Sky remake shader database.
+
+v1.6.1
+- Prevent kuro_gltf_to_meshes.py from crashing if a mesh does not have any materials assigned.
+
+v1.6.0
+- Add support for exporting and importing collision meshes (needed for maps).  See README for details in working with these meshes.
+- kuro_mdl_import_meshes.py will recalculate the bounding box of a mesh when importing, unless legacy metadata is used.
+- Vertex colors and excess UV maps are now preserved when creating a glTF (.glb/.gltf) file, and certain unknown vectors / quaternions / mesh flags are stored in the .metadata file to improve preservation of locator functions when using glTF to mod.
+
+v1.5.13
+- Force downgrade of custom animation MDLs to v1.  This is a small bugfix, the prior version only downgraded v2 to v1, now the script will downgrade any version newer than v1.
+
+v1.5.12
+- Add tool to decode and encode the binary JSON format used for PS4/Switch/CLE .mi files.
+- Update shader hash database to include new shaders from Kai no Kiseki.  Also added an analogous database for Ys X, which will be maintained separately from the Kuro games as the shader parameters are not compatible.
+- Added CLE encryption to compress_cle.py.  It will add encryption for any files it compresses, except for .mdl and .dds files.
+- Restrict BGRA vector order for COLOR semantic (as opposed to RGBA) to MDL v2, as v1 and v4 both appear to use RGBA.
+
+v1.5.11
+- Improve MDL v4 support.  kuro_mdl_import_meshes.py now enforces MDL v1/v2 imports to use VEC3 FLOATs whereas v4 uses VEC4 SNORM, and auto-converts the format as needed for upgrade/downgrade.  The script also enforces a minimum of 3 TEXCOORD for MDL v1/v2, duplicating the last TEXCOORD if less than 3 are present.
+- Add a script, kuro_find_missing_shaders.py, to find materials in a model that are missing from the targeted game.
+
+v1.5.10
+- When kuro_mdl_import_meshes.py encounters submeshes with non-matching vertex group maps (vgmap), it will now assess for possible compatibility and, if compatible, it will rewrite the vertex group map to match the internal structure of the mesh.
+- Change the default value for complete_vgmaps_default in kuro_gltf_to_meshes.py to True.
+
+v1.5.9
+- Add a simple shader hashing system, to be utilized for finding similar shaders.  A script, kuro_find_similar_shaders.py, and a database (kuro_shaders.csv) are now included in the release package; this script is used for finding shaders that are similar to the inputted shader, sorted by increasing difference in the shader switches.
+- Change the default value for complete_vgmaps_default in kuro_mdl_export_meshes.py to True.
+
+v1.5.8
+- Add support for updated Blender plugin that outputs .vb0 files (needed for Blender 4.x, tested with plugin commit 5fd206c).
+
+v1.5.7
+- Fix crash when building an MDL file with non-skinned meshes
+
+v1.5.6
+- No longer inserts duplicate materials if two or more meshes use the same material (required for v2 MDL).
+
+v1.5.5
+- Fix crash when deleting a mesh in a Kuro 2 MDL without downgrading to Kuro 1 format.
+
+v1.5.4
+- Hotfix for animation importing, which was broken in v1.5.3 resulting in the script crashing.
+
+v1.5.3
+- Support for extracting and importing animations in JSON format.  Currently this is the only way to edit non-TRS animations (UV scrolling, shader parameter varying).
+- Fix crash if gltf uses transformation matrices to describe nodes instead of TRS. (kuro_gltf_to_meshes.py)
+- Fix crash for if nodes have non-orthogonal rotation matrices. (kuro_gltf_to_meshes.py and kuro_mdl_import_animation.py)
+- Fix incorrect method of asin math domain error (Quaternion->Euler). (issue introduced in v1.5.1)
+- Add pygltflib module to python install modules
+
+v1.5.2
+- Materials are now imported from material_info.json into the MDL only if utilized by a mesh.
+- Merge animation script now detects animations vs costumes by _m vs _c in the name of the mdl.  It will merge animations into a costume if the base model is not available.
+- Merge animation script will now remove any animations it finds in the base model .glb before merging in the animation .glb data.  This is necessary both for Blender and for re-insertion into the game (but can be disabled by command line option).
+
+v1.5.1
+- Normal / Tangent SNORM support (MDL v4 NX assets)
+- Fix crash for MDL v2 empty mesh insertion
+- Fix crash for asin math domain error (Quaternion->Euler)
+
+v1.5.0
+- README updated, adding URL to Tutorial wiki.
+- Added support for animation.  Considered experimental at this time.  Only TRS animations are supported at this time.
+- Added support for skeleton modification, via glTF asset extraction.
+- Added support for glTF asset extract (meshes, skeleton, skeletal bindings)
+- glTF now properly assigns meshes to nodes.
+- Basic material support for glTF (base color texture and normal texture preview in Blender)
+- mesh_info.json now links to material_info.json by material name instead of index number.
+- Texture unknown 0 and 1 are now wrapS and wrapT
+- New image_list.json output from kuro_mdl_export_meshes.py
+- Catch and report errors for:
+    - Invalid JSON (update of lib_fmtibvb from repository eArmada8/gust_stuff)
+    - Missing JSON files
+    - Missing python module(s)
+    - Invalid vertex group mapping (improper weight transfer)
+    - Missing materials in metadata.json
+
+v1.3.4
+- For Kuro 1, missing submeshes are now deleted (reversion to v1.0.1 behavior).  Kuro 2 will continue have blank submeshes inserted.
+- CLE zstandard compression is now applied only if the original MDL file is compressed.
+
+v1.3.3
+- Remove non-allowed characters from filenames during export/import
+
+v1.3.2
+- Fix handling of COLOR during version downgrade (switch BGRA to RGBA)
+
+v1.3.1
+- Fix handling of UNKNOWN (Kuro 2 fix broke Kuro 1 compatibility, this restores Kuro 1 compatibility)
+- Fix parsing of mdl_version.json
+
+v1.3.0
+- Change UNKNOWN semantic to COLOR, changed interpretation from 32-bit float to R8B8G8A8_UNORM (thank you to fakecheng)
+- Add decompression tool
+- Add numpy module to python install modules
+
+v1.2.2
+- Fix import failing if called from commandline without force version
+
+v1.2.1
+- New JSON file with MDL version, to facilitate version downgrades
+
+v1.2.0
+- New command line option to force a downgrade during repacking from Kuro 2 format to Kuro 1 format
+- No longer deletes submeshes - instead an empty submesh is inserted (for Kuro 2 support)
+- Add (partial) support for direct editing of shader values (thank you to Arc)
+- Add pyquaternion to module installer batch file
+- Fix compression algorithm to byte-align (thank you to Shingentsu, TwnKey, Renza)
+- Fix Kuro 2 texture variables (thank you to fakecheng)
+
+v1.1.0
+- Adds support for Kuro no Kiseki 2
+- Importer now automatically compresses output (this can be turned off in a command-line option)
+- Exporter can be configured to output complete vgmaps by default, via global variable on line 20
+- Add compressor script (to compress accessory files, e.g. textures)
+
+v1.0.1
+- No longer crashes if model file does not have a skeleton
+
+v1.0.0
+- Initial release

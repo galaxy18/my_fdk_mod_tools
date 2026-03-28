@@ -1,0 +1,618 @@
+# Tool to manipulate ED9 / Kuro no Kiseki models in mdl format.  Replace mesh section of
+# Kuro no Kiseki mdl file with individual buffers previously exported.  Based on Uyjulian's script.
+# Usage:  Run by itself without commandline arguments and it will read only the mesh section of
+# every model it finds in the folder and replace them with fmt / ib / vb files in the same named
+# directory.
+#
+# For command line options, run:
+# /path/to/python3 kuro_mdl_import_meshes.py --help
+#
+# Requires both blowfish and zstandard for CLE assets.
+# These can be installed by:
+# /path/to/python3 -m pip install blowfish zstandard
+#
+# GitHub eArmada8/kuro_mdl_tool
+
+try:
+    import io, struct, numpy, sys, os, shutil, glob, base64, json, blowfish, operator, zstandard
+    from itertools import chain
+    from .lib_fmtibvb import *
+    from .kuro_mdl_export_meshes import *
+except ModuleNotFoundError as e:
+    print("Python module missing! {}".format(e.msg))
+    input("Press Enter to abort.")
+    raise   
+
+def compressCLE(file_content):
+    magic = file_content[0:4]
+    compressed_magic = b"D9BA"
+    result = file_content
+    if not magic == compressed_magic: # Don't compress files that are already compressed:
+        compressor = zstandard.ZstdCompressor(level = 12, write_checksum = True)
+        result = compressor.compress(file_content)
+        while (len(result) % 8) > 0:
+            result += b'\x00'
+        result = compressed_magic + struct.pack("<I", len(result)) + result
+    return result
+
+def make_pascal_string(string):
+    return struct.pack("<B", len(string)) + string.encode("utf8")
+
+# Primitive data is in Kuro 2.  In Kuro 1, it will be an empty buffer.
+# force_kuro_version should be either set to False, or to an integer.
+def insert_model_data (mdl_data, skeleton_section_data, material_section_data, mesh_section_data, primitive_section_data, kuro_ver):
+    with io.BytesIO(mdl_data) as f:
+        new_mdl_data = f.read(4) #Header
+        orig_kuro_ver, = struct.unpack("<I", f.read(4))
+        kuro_ver = min(kuro_ver, orig_kuro_ver)
+        new_mdl_data += struct.pack("<I", kuro_ver)
+        new_mdl_data += f.read(4) #Not sure what this is in the header
+        while True:
+            current_offset = f.tell()
+            section = f.read(8)
+            section_info = {}
+            try:
+                section_info["type"], section_info["size"] = struct.unpack("<II",section)
+                section += f.read(section_info["size"])
+            except:
+                break
+            if section_info["type"] == 0: # Material section to replace
+                section = material_section_data
+            if section_info["type"] == 1: # Mesh section to replace
+                section = mesh_section_data
+            if section_info["type"] == 2: # Skeleton section to replace
+                section = skeleton_section_data
+            if section_info["type"] == 4: # Primitive section to replace
+                if kuro_ver > 1:
+                    section = primitive_section_data
+                else: # Needed if we are forcing downgrade to version 1
+                    section = b''
+            new_mdl_data += section
+        # Catch the null bytes at the end of the stream
+        f.seek(current_offset,0)
+        new_mdl_data += f.read()
+        return(new_mdl_data)
+
+def build_skeleton_struct_from_mdl (mdl_filename):
+    # Will read data from JSON file, or load original data from the mdl file if JSON is missing
+    try:
+        skel_struct = read_struct_from_json(mdl_filename + "/skeleton.json")
+    except:
+        print("{0}/skeleton.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_filename))
+        with open(mdl_filename + '.mdl', "rb") as f:
+            mdl_data = f.read()
+        mdl_data = decryptCLE(mdl_data)
+        skel_struct = obtain_skeleton_data(mdl_data)
+    return(skel_struct)
+
+def build_skeleton_section (skel_struct):
+    output_buffer = struct.pack("<I", len(skel_struct))
+    for i in range(len(skel_struct)):
+        output_buffer += make_pascal_string(skel_struct[i]['name'])
+        output_buffer += struct.pack("<Ii", skel_struct[i]['type'], skel_struct[i]['mesh_index'])
+        output_buffer += struct.pack("<3f", *skel_struct[i]['pos_xyz'])
+        output_buffer += struct.pack("<4f", *skel_struct[i]['unknown_quat'])
+        output_buffer += struct.pack("<I", skel_struct[i]['skin_mesh'])
+        output_buffer += struct.pack("<3f", *skel_struct[i]['rotation_euler_rpy'])
+        output_buffer += struct.pack("<3f", *skel_struct[i]['scale'])
+        output_buffer += struct.pack("<3f", *skel_struct[i]['unknown'])
+        output_buffer += struct.pack("<I", len(skel_struct[i]['children']))
+        output_buffer += struct.pack("<{}I".format(len(skel_struct[i]['children'])), *skel_struct[i]['children'])
+    return(struct.pack("<2I", 2, len(output_buffer)) + output_buffer)
+
+def build_material_section (mdl_filename, material_list = [], kuro_ver = 1):
+    # Will read data from JSON file, or load original data from the mdl file if JSON is missing
+    try:
+        raw_material_struct = read_struct_from_json(mdl_filename + "/material_info.json")
+    except:
+        print("{0}/material_info.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_filename))
+        with open(mdl_filename + '.mdl', "rb") as f:
+            mdl_data = f.read()
+        mdl_data = decryptCLE(mdl_data)
+        raw_material_struct = obtain_material_data(mdl_data)
+    material_struct = []
+    try:
+        materials = [x['material_name'] for x in raw_material_struct]
+        for material in material_list:
+            material_struct.append(raw_material_struct[materials.index(material)])
+    except ValueError:
+        print("ValueError: Attempted to add material {0} it does not exist in material_info.json!".format(material))
+        input("Press Enter to abort.")
+        raise
+    output_buffer = struct.pack("<I", len(material_struct))
+    for i in range(len(material_struct)):
+        material_block = make_pascal_string(material_struct[i]['material_name']) \
+            + make_pascal_string(material_struct[i]['shader_name']) \
+            + make_pascal_string(material_struct[i]['str3'])
+        texture_blocks = bytes()
+        texture_block_count = 0
+        for j in range(len(material_struct[i]['textures'])):
+            texture_blocks += make_pascal_string(material_struct[i]['textures'][j]['texture_image_name']) \
+                + struct.pack("<i", material_struct[i]['textures'][j]['texture_slot'])
+            if kuro_ver > 1:
+                texture_blocks += struct.pack("<i", material_struct[i]['textures'][j]['unk_00'])
+            texture_blocks += struct.pack("<2i", material_struct[i]['textures'][j]['wrapS'], material_struct[i]['textures'][j]['wrapT'])
+            if kuro_ver > 1:
+                texture_blocks += struct.pack("<i", material_struct[i]['textures'][j]['unk_03'])
+            texture_block_count += 1
+        material_block += struct.pack("<I", texture_block_count) + texture_blocks
+        shader_elements = bytes()
+        shader_element_count = 0
+        for j in range(len(material_struct[i]['shaders'])):
+            if material_struct[i]['shaders'][j]['type_int'] in [0,1,4,5,6]: # These are decoded, so need to be encoded
+                struct_dict = {0: "<I", 1: "<I", 4: "<f", 5: "<2f", 6: "<3f"}
+                shader_elements += make_pascal_string(material_struct[i]['shaders'][j]['shader_name']) \
+                    + struct.pack("<I", material_struct[i]['shaders'][j]['type_int'])
+                if type(material_struct[i]['shaders'][j]['data']) == list:
+                    shader_elements += struct.pack(struct_dict[material_struct[i]['shaders'][j]['type_int']], *material_struct[i]['shaders'][j]['data'])
+                else:
+                    shader_elements += struct.pack(struct_dict[material_struct[i]['shaders'][j]['type_int']], material_struct[i]['shaders'][j]['data'])
+            else:
+                shader_elements += make_pascal_string(material_struct[i]['shaders'][j]['shader_name']) \
+                    + struct.pack("<I", material_struct[i]['shaders'][j]['type_int']) \
+                    + base64.b64decode(material_struct[i]['shaders'][j]['data_base64'])
+            shader_element_count += 1
+        material_block += struct.pack("<I", shader_element_count) + shader_elements
+        material_switches = bytes()
+        material_switch_count = 0
+        for j in range(len(material_struct[i]['material_switches'])):
+            material_switches += make_pascal_string(material_struct[i]['material_switches'][j]['material_switch_name']) \
+                + struct.pack("<i", material_struct[i]['material_switches'][j]['int2'])
+            material_switch_count += 1
+        material_block += struct.pack("<I", material_switch_count) + material_switches
+        material_block += struct.pack("<I{0}B".format(len(material_struct[i]['uv_map_indices'])), len(material_struct[i]['uv_map_indices']), *material_struct[i]['uv_map_indices'])
+        material_block += struct.pack("<I{0}B".format(len(material_struct[i]['unknown1'])), len(material_struct[i]['unknown1']), *material_struct[i]['unknown1'])
+        material_block += struct.pack("<3IfI", *material_struct[i]['unknown2'])
+        output_buffer += material_block
+    return(struct.pack("<2I", 0, len(output_buffer)) + output_buffer)
+
+# Calculate the normal vector for a collision mesh triangle.
+def triangle_normal(pos_vector):
+    pos = numpy.array(pos_vector)
+    calc_nrm = numpy.cross(pos[1] - pos[0], pos[2] - pos[0])
+    calc_nrm = calc_nrm / numpy.linalg.norm(calc_nrm)
+    return calc_nrm
+
+# Calculate the circumsphere for a collision mesh triangle.  This function is written by chatgpt.
+# Gratitude and credit to chatgpt and all the code that went into its training and their authors.
+def circumsphere(pos_vector):
+    pos = numpy.array(pos_vector)
+
+    if numpy.dot(pos[1] - pos[0], pos[2] - pos[0]) <= 0: return (pos[1] + pos[2]) / 2, numpy.linalg.norm(pos[1] - pos[2]) / 2
+    if numpy.dot(pos[0] - pos[1], pos[2] - pos[1]) <= 0: return (pos[0] + pos[2]) / 2, numpy.linalg.norm(pos[0] - pos[2]) / 2
+    if numpy.dot(pos[0] - pos[2], pos[1] - pos[2]) <= 0: return (pos[0] + pos[1]) / 2, numpy.linalg.norm(pos[0] - pos[1]) / 2
+
+    # For an acute triangle, we must compute the circumcenter.
+    # First, construct an orthonormal basis (u, v) for the plane of the triangle.
+    u = pos[1] - pos[0]
+    u = u / numpy.linalg.norm(u)
+    # The normal to the plane
+    normal = numpy.cross(pos[1] - pos[0], pos[2] - pos[0])
+    normal = normal / numpy.linalg.norm(normal)
+    # The in-plane vector perpendicular to u
+    v = numpy.cross(normal, u)
+
+    # Project points pos[1] and pos[2] onto the (u,v) coordinate system with pos[0] as the origin.
+    pB = numpy.array([numpy.linalg.norm(pos[1] - pos[0]), 0])
+    pC = numpy.array([numpy.dot(pos[2] - pos[0], u), numpy.dot(pos[2] - pos[0], v)])
+
+    # Solve for the circumcenter in 2D.
+    # The perpendicular bisector of the segment from (0,0) to pB has the equation:
+    #   pB[0]*x + pB[1]*y = 0.5 * (||pB||^2)
+    # Similarly for the segment from (0,0) to pC.
+    M = numpy.array([[pB[0], pB[1]], [pC[0], pC[1]]])
+    b_vec = numpy.array([0.5 * numpy.dot(pB, pB), 0.5 * numpy.dot(pC, pC)])
+
+    # Solve the linear system to get the 2D circumcenter coordinates (x, y)
+    circumcenter_2d = numpy.linalg.solve(M, b_vec)
+
+    # Map the 2D circumcenter back to 3D
+    center = pos[0] + circumcenter_2d[0] * u + circumcenter_2d[1] * v
+    radius = numpy.linalg.norm(center - pos[0])
+
+    return (center, radius)
+
+# Takes a collision mesh struct with raw buffers and outputs the triangles in the format the Kuro engine expects
+def generate_triangle_struct(mesh_struct):
+    triangle_struct = []
+    posidx = [x['SemanticName'] for x in mesh_struct['vb']].index('POSITION')
+    for i in range(len(mesh_struct['ib'])):
+        pos_vector = [mesh_struct['vb'][posidx]['Buffer'][j] for j in mesh_struct['ib'][i]]
+        nrm_vector = triangle_normal(pos_vector)
+        midpoint, radius = circumsphere(pos_vector)
+        triangle = {'pos': pos_vector, 'nrm': nrm_vector.tolist(), 'midpoint': midpoint.tolist(), 'radius': radius.tolist()}
+        triangle_struct.append(triangle)
+    return triangle_struct
+
+# This is specifically for constructing the BVH tree, and takes a triangle struct in the collision mesh format
+def bounding_box (triangles):
+    x = [x[0] for y in triangles for x in y[1]['pos']]
+    y = [x[1] for y in triangles for x in y[1]['pos']]
+    z = [x[2] for y in triangles for x in y[1]['pos']]
+    return([[min(x), min(y), min(z)], [max(x), max(y), max(z)]])
+
+class BVHNode:  # Self-running recursive class to build a bounding volume hierarchy node tree
+    def __init__(self, triangles, max_per_node = 2):
+        self.bounds = bounding_box(triangles)
+        self.children = []  # Always 0 or 2 elements
+        self.tri_indices = []  # Stores indices of triangles
+        if len(triangles) > max_per_node:
+            axis_len = list(enumerate([max([x[1]['midpoint'][0] for x in triangles]) - min([x[1]['midpoint'][0] for x in triangles]),
+                max([x[1]['midpoint'][1] for x in triangles]) - min([x[1]['midpoint'][1] for x in triangles]),
+                max([x[1]['midpoint'][2] for x in triangles]) - min([x[1]['midpoint'][2] for x in triangles])]))
+            a = [x[0] for x in sorted(axis_len, key = lambda e: e[1], reverse = True)] # Axes longest to shortest
+            sorted_triangles = sorted(triangles, key = lambda x: (x[1]['midpoint'][a[0]], x[1]['midpoint'][a[1]], x[1]['midpoint'][a[2]]))
+            set1 = sorted_triangles[:len(sorted_triangles)//2]
+            set2 = sorted_triangles[len(sorted_triangles)//2:]
+            self.children = [BVHNode(set1, max_per_node), BVHNode(set2, max_per_node)]
+        else:
+            self.tri_indices = [x[0] for x in triangles]
+
+# node is of type BVHNode class, run with root node
+def add_node_to_BVH_list (node, node_list = [{}], i = 0): # i is current node
+    node_list[i]['min'] = node.bounds[0]
+    node_list[i]['max'] = node.bounds[1]
+    if len(node.children) > 0:
+        node_list[i]['start'] = len(node_list)
+        node_list[i]['end'] = len(node_list) + len(node.children) - 1
+        node_list[i]['triangles'] = []
+        new_children_indices = []
+        for j in range(len(node.children)):
+            new_children_indices.append(len(node_list))
+            node_list.append({})
+        for j in range(len(node.children)):
+            node_list = add_node_to_BVH_list(node.children[j], node_list, new_children_indices[j])
+    else:
+        node_list[i]['start'] = -1
+        node_list[i]['end'] = -1
+        node_list[i]['triangles'] = node.tri_indices
+    return(node_list)
+
+def triangle_struct_to_bvh_node_list (triangle_struct):
+    return (add_node_to_BVH_list(BVHNode(list(enumerate(triangle_struct))), [{}], 0))
+
+def build_mesh_section (mdl_filename, kuro_ver = 1):
+    # Ordinarily we do not need to parse the original file, but in case we do, we only want to do it once
+    has_parsed_original_file = False
+    try:
+        mesh_struct_metadata = read_struct_from_json(mdl_filename + "/mesh_info.json")
+    except:
+        print("{0}/mesh_info.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_filename))
+        with open(mdl_filename + '.mdl', "rb") as f:
+            mdl_data = f.read()
+        mdl_data = decryptCLE(mdl_data)
+        mesh_struct = obtain_mesh_data(mdl_data, obtain_material_data(mdl_data))
+        has_parsed_original_file = True
+        mesh_struct_metadata = mesh_struct["mesh_blocks"]
+    output_buffer = struct.pack("<I", len(mesh_struct_metadata))
+    material_list = []
+    if kuro_ver > 1:
+        prim_output_header = bytes()
+        prim_output_data = bytes()
+        prim_buffer_count = 0
+    for i in range(len(mesh_struct_metadata)):
+        mesh_block = bytes()
+        meshes = 0 # Keep count of actual meshes imported, in case some have been deleted
+        safe_filename = "".join([x if x not in "\\/:*?<>|" else "_" for x in mesh_struct_metadata[i]["name"]])
+        if "nodes" in mesh_struct_metadata[i].keys():
+            expected_vgmap = {mesh_struct_metadata[i]['nodes'][j]['name']:j for j in range(len(mesh_struct_metadata[i]['nodes']))}
+        else:
+            expected_vgmap = {}
+        # Initialize bounding box - I have no idea why this works, but it does.
+        bbox = {'min_x': True, 'min_y': True, 'min_z': True, 'max_x': False, 'max_y': False, 'max_z': False}
+        for j in range(len(mesh_struct_metadata[i]["primitives"])):
+            try:
+                mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, safe_filename, j)
+                fmt = read_fmt(mesh_filename + '.fmt')
+                ib = list(chain.from_iterable(read_ib(mesh_filename + '.ib', fmt)))
+                vb = read_vb(mesh_filename + '.vb', fmt)
+            except FileNotFoundError:
+                if kuro_ver > 1:
+                    print("Submesh {0} not found, generating an empty submesh...".format(mesh_filename))
+                    if has_parsed_original_file == False:
+                        with open(mdl_filename + '.mdl', "rb") as f:
+                            mdl_data = f.read()
+                        mdl_data = decryptCLE(mdl_data)
+                        mesh_struct = obtain_mesh_data(mdl_data, obtain_material_data(mdl_data))
+                        has_parsed_original_file = True
+                    # Generate an empty submesh
+                    fmt = make_fmt_struct(mesh_struct["mesh_buffers"][i][j])
+                    ib = []
+                    vb = mesh_struct["mesh_buffers"][i][j]['vb']
+                else:
+                    print("Submesh {0} not found, skipping...".format(mesh_filename))
+                    continue
+            print("Processing submesh {0}...".format(mesh_filename))
+            # VGMap sanity check - Make sure the .vgmap file matches the actual skin node tree
+            try:
+                vgmap = read_struct_from_json(mesh_filename + '.vgmap')
+                if not (all([True if x in expected_vgmap else False for x in vgmap])\
+                    and all([expected_vgmap[x] == vgmap[x] for x in vgmap])):
+                    print("Warning! {}.vgmap does not match the internal skin node tree!".format(mesh_filename))
+                    rev_vgmap = {vgmap[k]:k for k in vgmap}
+                    semantics = [x['SemanticName'] for x in vb]
+                    if 'BLENDINDICES' in semantics and ('BLENDWEIGHT' in semantics or 'BLENDWEIGHTS' in semantics):
+                        vg_index = semantics.index('BLENDINDICES')
+                        if 'BLENDWEIGHT' in semantics:
+                            wt_index = semantics.index('BLENDWEIGHT')
+                        else:
+                            wt_index = semantics.index('BLENDWEIGHTS')
+                        indices = [x for y in vb[vg_index]['Buffer'] for x in y]
+                        weights = [x for y in vb[wt_index]['Buffer'] for x in y]
+                        true_indices = sorted(list(set([indices[k] for k in range(len(indices)) if weights[k] > 0.0])))
+                        used_vg = [rev_vgmap[z] for z in true_indices]
+                        if all([x in expected_vgmap.keys() for x in used_vg]):
+                            print("VGMap appears compatible, attempting automatic remap...")
+                            new_buffer = []
+                            for k in range(len(vb[vg_index]['Buffer'])):
+                                new_buffer.append([expected_vgmap[y] if y in expected_vgmap else 0 for y \
+                                    in [rev_vgmap[z] for z in vb[vg_index]['Buffer'][k]]])
+                            vb[vg_index]['Buffer'] = new_buffer
+                        else:
+                            print("VGMap incompatible with this mesh, automatic remap not possible.")
+                            print("This model will likely have major animation distortions and may crash the game.")
+                            input("Press Enter to continue.")
+                    else:
+                        pass # No weights, sanity check unnecessary
+            except FileNotFoundError:
+                if len(expected_vgmap) > 1:
+                    print("{}.vgmap not found, vertex group sanity check skipped.".format(mesh_filename))
+            if mesh_struct_metadata[i]["primitives"][j]["material"] in material_list:
+                primitive_buffer = struct.pack("<I", material_list.index(mesh_struct_metadata[i]["primitives"][j]["material"]))
+            else:
+                primitive_buffer = struct.pack("<I", len(material_list))
+                material_list.append(mesh_struct_metadata[i]["primitives"][j]["material"])
+            num_texcoord = len([x for x in fmt["elements"] if x["SemanticName"] == "TEXCOORD"])
+            primitive_buffer_elements = len(vb)+1 # vb+ib
+            if kuro_ver <= 2 and num_texcoord in [1,2]: # Increase texcoord to 3, required by Kuro 1 (&2?)
+                primitive_buffer_elements += 3 - num_texcoord
+            if kuro_ver == 1:
+                primitive_buffer += struct.pack("<I", primitive_buffer_elements)
+            elif kuro_ver > 1:
+                primitive_buffer += struct.pack("<2I", len(ib), mesh_struct_metadata[i]["primitives"][j]["unk"])
+            texcoord_counter = 0
+            for k in range(len(vb)):
+                dxgi_format = fmt["elements"][k]["Format"].split('DXGI_FORMAT_')[-1]
+                dxgi_format_split = dxgi_format.split('_')
+                vec_type = dxgi_format_split[1]
+                vec_format = re.findall("[0-9]+",dxgi_format_split[0])
+                vec_first_color = dxgi_format_split[0][0] # Should be R in most cases, but will be B if format is B8G8R8A8_UNORM
+                vec_elements = len(vec_format)
+                vec_stride = int(int(vec_format[0]) * vec_elements / 8)
+                reverse_colors = False # COLOR is BGR in Kuro 2
+                eval_buffer_len = False # Normal and Tangent may need buffer length change
+                match vb[k]["SemanticName"]:
+                    case "POSITION":
+                        type_int = 0
+                        #Bounding box
+                        bbox_min = [min(x[0] for x in vb[k]["Buffer"]),
+                            min(x[1] for x in vb[k]["Buffer"]),
+                            min(x[2] for x in vb[k]["Buffer"])]
+                        bbox_max = [max(x[0] for x in vb[k]["Buffer"]),
+                            max(x[1] for x in vb[k]["Buffer"]),
+                            max(x[2] for x in vb[k]["Buffer"])]
+                        bbox['min_x'] = min(bbox['min_x'], bbox_min[0])
+                        bbox['min_y'] = min(bbox['min_y'], bbox_min[1])
+                        bbox['min_z'] = min(bbox['min_z'], bbox_min[2])
+                        bbox['max_x'] = max(bbox['max_x'], bbox_max[0])
+                        bbox['max_y'] = max(bbox['max_y'], bbox_max[1])
+                        bbox['max_z'] = max(bbox['max_z'], bbox_max[2])
+                    case "NORMAL":
+                        type_int = 1
+                        eval_buffer_len = True
+                    case "TANGENT":
+                        type_int = 2
+                        eval_buffer_len = True
+                    case "COLOR":
+                        type_int = 3
+                        if kuro_ver == 1: # Forcing 32-bit float since Kuro 1 uses float
+                            if vec_first_color == 'B':
+                                reverse_colors = True
+                            vec_type = 'FLOAT'
+                            vec_stride = 4 * vec_elements
+                        elif kuro_ver > 1: # Forcing 8-bit unorm since MDL v2 and up use 8-bit UNORM
+                            if vec_first_color == 'R' and kuro_ver == 2: # Kuro 2 uses BGRA instead of RGBA
+                                reverse_colors = True
+                            elif vec_first_color == 'B' and not kuro_ver == 2:
+                                reverse_colors = True
+                            vec_type = 'UNORM'
+                            vec_stride = vec_elements
+                    case "TEXCOORD":
+                        type_int = 4
+                        texcoord_counter += 1 # This will be 1 for TEXCOORD0, 2 for TEXCOORD1, etc
+                    case "BLENDWEIGHT" | "BLENDWEIGHTS":
+                        type_int = 5
+                    case "BLENDINDICES":
+                        type_int = 6
+                if reverse_colors == True and vec_elements == 4: # vec_elements should ALWAYS be 4 with COLOR, but just in case
+                    current_buffer = [[x[2],x[1],x[0],x[3]] for x in vb[k]["Buffer"]]
+                else:
+                    current_buffer = vb[k]["Buffer"]
+                if eval_buffer_len == True and type_int in [1,2]: # Only eval for Normal, Tangent
+                    if kuro_ver <= 2 : # Forcing 32-bit float since Kuro 1 uses float
+                        vec_type, vec_elements, vec_stride = 'FLOAT', 3, 12
+                        current_buffer = [x[0:3] for x in vb[k]["Buffer"]]
+                    elif kuro_ver > 2: # Forcing 8-bit VEC4
+                        vec_type, vec_elements, vec_stride = 'SNORM', 4, 4
+                        if len(vb[k]["Buffer"][0]) < 4:
+                            current_buffer = [x[0:3]+[0.0]*(4-len(vb[k]["Buffer"][0])) for x in vb[k]["Buffer"]]
+                        else:
+                            current_buffer = vb[k]["Buffer"]
+                match vec_type:
+                    case "FLOAT":
+                        element_type = 'f'
+                        data_list = list(chain.from_iterable(current_buffer))
+                    case "UINT":
+                        element_type = 'I' # Assuming 32-bit since Kuro models all use 32-bit
+                        data_list = list(chain.from_iterable(current_buffer))
+                    case "UNORM":
+                        element_type = 'B'
+                        float_max = ((2**8)-1)
+                        data_list = [int(round(min(max(x,0), 1) * float_max)) for x in list(chain.from_iterable(current_buffer))]
+                    case "SNORM":
+                        element_type = 'b'
+                        float_max = ((2**(8-1))-1)
+                        data_list = [int(round(min(max(x,-1), 1) * float_max)) for x in list(chain.from_iterable(current_buffer))]
+                raw_buffer = struct.pack("<{0}{1}".format(len(data_list), element_type), *data_list)
+                if kuro_ver == 1:
+                    primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
+                elif kuro_ver > 1:
+                    prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
+                    prim_output_data += raw_buffer
+                    prim_buffer_count += 1
+                # Minimum 3 texcoord, required by Kuro 1 (&2?)
+                if kuro_ver <= 2 and type_int == 4 and num_texcoord in [1,2] and texcoord_counter == num_texcoord:
+                    for l in range(3 - num_texcoord):
+                        if kuro_ver == 1:
+                            primitive_buffer += struct.pack("<3I", type_int, len(raw_buffer), vec_stride) + raw_buffer
+                        elif kuro_ver > 1:
+                            prim_output_header += struct.pack("<5I", type_int, len(raw_buffer), vec_stride, i, j)
+                            prim_output_data += raw_buffer
+                            prim_buffer_count += 1
+            # After VB, need to add IB
+            # Making assumptions here that it will always be in Rxx_UINT format, saves a bunch of code
+            vec_stride = int(int(re.findall("[0-9]+",fmt["format"].split('DXGI_FORMAT_')[-1].split('_')[0])[0]) / 8)
+            raw_ibuffer = struct.pack("<{0}I".format(len(ib), element_type), *ib)
+            if kuro_ver == 1:
+                primitive_buffer += struct.pack("<3I", 7, len(raw_ibuffer), vec_stride) + raw_ibuffer
+            elif kuro_ver > 1:
+                prim_output_header += struct.pack("<5I", 7, len(raw_ibuffer), vec_stride, i, j)
+                prim_output_data += raw_ibuffer
+                prim_buffer_count += 1
+            mesh_block += primitive_buffer
+            meshes += 1
+        mesh_block = struct.pack("<I", meshes) + mesh_block
+        if "nodes" in mesh_struct_metadata[i].keys():
+            node_count = len(mesh_struct_metadata[i]["nodes"])
+        else:
+            node_count = 0
+        node_block = struct.pack("<I", node_count)
+        if node_count > 0:
+            for j in range(node_count):
+                node_block += make_pascal_string(mesh_struct_metadata[i]["nodes"][j]["name"])
+                node_block += struct.pack("<16f", *list(chain.from_iterable(mesh_struct_metadata[i]["nodes"][j]["matrix"])))
+        mesh_block += node_block
+        if "data" in mesh_struct_metadata[i]["section2"]: # Legacy mode
+            raw_section2 = struct.pack("<3fI3f4I", *mesh_struct_metadata[i]["section2"]["data"])
+        else: # Decoded data
+            collision_present = True
+            try:
+                mesh_filename = mdl_filename + '/{0}_{1}_collision'.format(i, safe_filename)
+                fmt = read_fmt(mesh_filename + '.fmt')
+                ib = read_ib(mesh_filename + '.ib', fmt)
+                vb = read_vb(mesh_filename + '.vb', fmt)
+            except FileNotFoundError:
+                collision_present = False
+            if collision_present:
+                triangle_struct = generate_triangle_struct({'fmt': fmt, 'ib': ib, 'vb': vb})
+                node_list = triangle_struct_to_bvh_node_list(triangle_struct)
+                # I think I could just read the root node for the bounding box
+                # because collision and visible meshes are separated, but just in case...
+                bbox['min_x'] = min(bbox['min_x'], node_list[0]['min'][0])
+                bbox['min_y'] = min(bbox['min_y'], node_list[0]['min'][1])
+                bbox['min_z'] = min(bbox['min_z'], node_list[0]['min'][2])
+                bbox['max_x'] = max(bbox['max_x'], node_list[0]['max'][0])
+                bbox['max_y'] = max(bbox['max_y'], node_list[0]['max'][1])
+                bbox['max_z'] = max(bbox['max_z'], node_list[0]['max'][2])
+            raw_section2 = bytearray(struct.pack("<3fI3fI", bbox['min_x'], bbox['min_y'], bbox['min_z'],
+                mesh_struct_metadata[i]["section2"]["unk0"],
+                bbox['max_x'], bbox['max_y'],bbox['max_z'],
+                mesh_struct_metadata[i]["section2"]["unk1"]))
+            if collision_present:
+                raw_section2.extend(struct.pack("<I", len(triangle_struct)))
+                for j in range(len(triangle_struct)):
+                    raw_section2.extend(struct.pack("<16f",
+                        *[x for y in triangle_struct[j]['pos'] for x in y],
+                        *triangle_struct[j]['nrm'],
+                        *triangle_struct[j]['midpoint'],
+                        triangle_struct[j]['radius']))
+                raw_section2.extend(struct.pack("<I", len(node_list)))
+                for j in range(len(node_list)):
+                    raw_section2.extend(struct.pack("<6f2iI{}I".format(len(node_list[j]['triangles'])),
+                        *node_list[j]['min'],
+                        *node_list[j]['max'],
+                        node_list[j]['start'],
+                        node_list[j]['end'],
+                        len(node_list[j]['triangles']),
+                        *node_list[j]['triangles']))
+            else:
+                raw_section2.extend(struct.pack("<2I", 0, 0))
+            raw_section2.extend(struct.pack("<I", mesh_struct_metadata[i]["section2"]["flags"]))
+        section2_block = struct.pack("<I", len(raw_section2)) + bytes(raw_section2)
+        mesh_block = make_pascal_string(mesh_struct_metadata[i]["name"]) + struct.pack("<I", len(mesh_block)) + mesh_block + section2_block
+        output_buffer += mesh_block
+        mesh_section_buffer = struct.pack("<2I", 1, len(output_buffer)) + output_buffer
+        primitive_section_buffer = bytes()
+        if kuro_ver > 1: # Primitives in a separate section #4
+            primitive_output_buffer = struct.pack("<I", prim_buffer_count) + prim_output_header + prim_output_data
+            primitive_section_buffer += struct.pack("<2I", 4, len(primitive_output_buffer)) + primitive_output_buffer
+    return(mesh_section_buffer, primitive_section_buffer, material_list)
+
+def process_mdl (mdl_file, mdl_data, change_compression = False, force_kuro_version = False, nobak = False):
+    #with open(mdl_file, "rb") as f:
+    #    mdl_data = f.read()
+    print("Processing {0}...".format(mdl_file))
+    if mdl_data[0:4] in [b"F9BA", b"C9BA", b"D9BA"]:
+        compressed = True
+        mdl_data = decryptCLE(mdl_data)
+    else:
+        compressed = False
+    if obtain_material_data(mdl_data) == False:
+        print("Skipping {0} as it is not a model file.".format(mdl_file))
+        return False
+    kuro_ver = get_kuro_ver(mdl_data)
+    try: # Attempt to get MDL version from JSON file, if this fails just use version number embedded in MDL
+        json_kuro_ver = read_struct_from_json(mdl_file[:-4] + '/mdl_version.json')['mdl_version']
+        if json_kuro_ver > 0 and json_kuro_ver <= kuro_ver:
+            kuro_ver = json_kuro_ver
+    except:
+        print("{0}/mdl_version.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_file[:-4]))
+    # Command line option overrides JSON file
+    if force_kuro_version != False and force_kuro_version < kuro_ver:
+        kuro_ver = force_kuro_version
+    skeleton_data = build_skeleton_section(build_skeleton_struct_from_mdl(mdl_file[:-4]))
+    mesh_data, primitive_data, material_list = build_mesh_section(mdl_file[:-4], kuro_ver = kuro_ver)
+    material_data = build_material_section(mdl_file[:-4], material_list, kuro_ver)
+    new_mdl_data = insert_model_data(mdl_data, skeleton_data, material_data, mesh_data, primitive_data, kuro_ver)
+    # Instead of overwriting backups, it will just tag a number onto the end
+    backup_suffix = ''
+    if nobak == False:
+        if os.path.exists(mdl_file + '.bak' + backup_suffix):
+            backup_suffix = '1'
+            if os.path.exists(mdl_file + '.bak' + backup_suffix):
+                while os.path.exists(mdl_file + '.bak' + backup_suffix):
+                    backup_suffix = str(int(backup_suffix) + 1)
+            shutil.copy2(mdl_file, mdl_file + '.bak' + backup_suffix)
+        else:
+            shutil.copy2(mdl_file, mdl_file + '.bak')
+    if (compressed == True and change_compression == False) or (compressed == False and change_compression == True):
+        new_mdl_data = compressCLE(new_mdl_data)
+    with open(mdl_file,'wb') as f:
+        f.write(new_mdl_data)
+
+if __name__ == "__main__":
+    # Set current directory
+    if getattr(sys, 'frozen', False):
+        os.chdir(os.path.dirname(sys.executable))
+    else:
+        os.chdir(os.path.abspath(os.path.dirname(__file__)))
+
+    # If argument given, attempt to import into file in argument
+    if len(sys.argv) > 1:
+        import argparse
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-f', '--force_version', help="Force compile at a specific Kuro version (must be equal to or lower than original)", type=int, choices=range(1,3))
+        parser.add_argument('-c', '--change_compression', help="Change compression (compressed to uncompressed or vice versa)", action="store_true")
+        parser.add_argument('mdl_filename', help="Name of mdl file to import into (required).")
+        args = parser.parse_args()
+        if args.force_version == None:
+            force_kuro_version = False
+        else:
+            force_kuro_version = args.force_version
+        if os.path.exists(args.mdl_filename) and args.mdl_filename[-4:].lower() == '.mdl':
+            process_mdl(args.mdl_filename, change_compression = args.change_compression, force_kuro_version = force_kuro_version)
+    else:
+        mdl_files = glob.glob('*.mdl')
+        mdl_files = [x for x in mdl_files if os.path.isdir(x[:-4])]
+        for i in range(len(mdl_files)):
+            process_mdl(mdl_files[i])
