@@ -1,7 +1,7 @@
 bl_info = {
     "name": "FDK Snippets",
     "author": "",
-    "version": (1, 1, 1),
+    "version": (1, 1, 2),
     "blender": (4, 2, 3),
     "location": "View3D > Tool Shelf >FDK_Snippets Panel",
     "description": "FDK MOD制作 快捷代码",
@@ -20,6 +20,7 @@ bl_info = {
 #1.0.9:将FGOA相关命令移到单独的分页；增加根据json修改骨架父子层级
 #1.1.0:将转换mdl系列命令整合为按钮，调用kuro_mdl_tool v1.6.5
 #1.1.1:增加将mdl转换为gltf格式之后直接导入的测试功能，调用io_scene_gltf2 v5.2.11
+#1.1.2:增加贴图不改为png和不对原mdl进行备份的选项
 ########################## Divider ##########################
 from . import panel
 
