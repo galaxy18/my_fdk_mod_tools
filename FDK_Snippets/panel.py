@@ -132,6 +132,15 @@ class O_ImportMDL(bpy.types.Operator, ImportHelper):
         gltf_importer.glb_buffer=giant_buffer
         BlenderGlTF.create(gltf_importer)
         
+        bpy.ops.object.select_all(action='DESELECT')
+        collection = bpy.data.collections.get('glTF_not_exported')
+        if not collection is None:
+            bpy.data.collections.remove(collection)
+        for obj in bpy.data.objects:
+            if obj.type == "ARMATURE":
+                for bone in obj.pose.bones:
+                    bone.custom_shape = None
+        
         return {'FINISHED'}
 ########################## Divider ##########################
 class O_GltfToMeshes(bpy.types.Operator, ImportHelper):
