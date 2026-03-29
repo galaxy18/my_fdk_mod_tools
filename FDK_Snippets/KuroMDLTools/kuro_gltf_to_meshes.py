@@ -348,6 +348,9 @@ def process_gltf (gltf_filename, complete_maps = complete_vgmaps_default, overwr
     if os.path.exists(model_name) and (os.path.isdir(model_name)) and (overwrite == False):
         if str(input(model_name + " folder exists! Overwrite? (y/N) ")).lower()[0:1] == 'y':
             overwrite = True
+    process_data(model_name, model_gltf, metadata, complete_maps = complete_maps, overwrite = overwrite)
+
+def process_data (model_name, model_gltf, metadata, complete_maps = True, overwrite = True):
     if (overwrite == True) or not os.path.exists(model_name):
         if not os.path.exists(model_name):
             os.mkdir(model_name)

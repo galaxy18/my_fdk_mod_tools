@@ -100,7 +100,7 @@ def build_skeleton_section (skel_struct):
         output_buffer += struct.pack("<{}I".format(len(skel_struct[i]['children'])), *skel_struct[i]['children'])
     return(struct.pack("<2I", 2, len(output_buffer)) + output_buffer)
 
-def build_material_section (mdl_filename, material_list = [], kuro_ver = 1):
+def build_material_section (self, context, mdl_filename, material_list = [], kuro_ver = 1):
     # Will read data from JSON file, or load original data from the mdl file if JSON is missing
     try:
         raw_material_struct = read_struct_from_json(mdl_filename + "/material_info.json")
@@ -116,9 +116,9 @@ def build_material_section (mdl_filename, material_list = [], kuro_ver = 1):
         for material in material_list:
             material_struct.append(raw_material_struct[materials.index(material)])
     except ValueError:
-        print("ValueError: Attempted to add material {0} it does not exist in material_info.json!".format(material))
-        input("Press Enter to abort.")
-        raise
+        self.report({'ERROR'}, f"ValueError: Attempted to add material {material} it does not exist in material_info.json!")
+        #input("Press Enter to abort.")
+        #raise
     output_buffer = struct.pack("<I", len(material_struct))
     for i in range(len(material_struct)):
         material_block = make_pascal_string(material_struct[i]['material_name']) \
@@ -548,7 +548,7 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
             primitive_section_buffer += struct.pack("<2I", 4, len(primitive_output_buffer)) + primitive_output_buffer
     return(mesh_section_buffer, primitive_section_buffer, material_list)
 
-def process_mdl (mdl_file, mdl_data, change_compression = False, force_kuro_version = False, nobak = False):
+def process_mdl (mdl_file, mdl_data, self, context, change_compression = False, force_kuro_version = False, nobak = False):
     #with open(mdl_file, "rb") as f:
     #    mdl_data = f.read()
     print("Processing {0}...".format(mdl_file))
@@ -572,7 +572,7 @@ def process_mdl (mdl_file, mdl_data, change_compression = False, force_kuro_vers
         kuro_ver = force_kuro_version
     skeleton_data = build_skeleton_section(build_skeleton_struct_from_mdl(mdl_file[:-4]))
     mesh_data, primitive_data, material_list = build_mesh_section(mdl_file[:-4], kuro_ver = kuro_ver)
-    material_data = build_material_section(mdl_file[:-4], material_list, kuro_ver)
+    material_data = build_material_section(self, context, mdl_file[:-4], material_list, kuro_ver)
     new_mdl_data = insert_model_data(mdl_data, skeleton_data, material_data, mesh_data, primitive_data, kuro_ver)
     # Instead of overwriting backups, it will just tag a number onto the end
     backup_suffix = ''

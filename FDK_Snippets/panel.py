@@ -1,16 +1,126 @@
 import bpy,os,json
 import mathutils,math,numpy,copy
-from bpy_extras.io_utils import ImportHelper
+from bpy_extras.io_utils import ImportHelper, ExportHelper
 from mathutils import Vector,Quaternion
-from .KuroMDLTools import kuro_mdl_to_basic_gltf, kuro_mdl_import_meshes, kuro_mdl_export_meshes, kuro_gltf_to_meshes
+from .KuroMDLTools import kuro_mdl_to_basic_gltf, kuro_mdl_import_meshes, kuro_mdl_export_meshes, kuro_gltf_to_meshes, lib_fmtibvb
 from .io_scene_gltf2.blender.imp.blender_gltf import BlenderGlTF
 from .io_scene_gltf2.io.imp.gltf2_io_gltf import glTFImporter
 from .io_scene_gltf2.io.com.gltf2_io import Gltf, gltf_from_dict
+from .io_scene_gltf2.blender.exp.export import __export as gltf2_blender_export
+########################## Divider ##########################
+class O_ExportVBIB(bpy.types.Operator, ExportHelper):
+    bl_idname = "fdktools.export_to_vbib"
+    bl_label = "导出文件夹"
+    bl_description = "输出VBIB及JSON"
+    filename_ext = ".*"
+    filter_glob: bpy.props.StringProperty(
+        default="bpy.context.blend_data.filepath.*",
+        options={'HIDDEN'},
+        maxlen=255,  # Max internal buffer length, longer would be clamped.
+    )
+    
+    def execute(self, context):
+        from .io_scene_gltf2.io.com.debug import Log
+        from pygltflib import GLTF2
+        import logging
+        
+        export_settings = self.as_keywords()
+        export_settings['gltf_filepath'] = self.filepath
+        export_settings['gltf_user_extensions'] = []
+        export_settings['gltf_hierarchy_full_collections'] = False
+        export_settings['gltf_armature_object_remove'] = False
+        export_settings['gltf_flatten_bones_hierarchy'] = False
+        export_settings['gltf_flatten_obj_hierarchy'] = False
+        export_settings['gltf_leaf_bone'] = False
+        export_settings['gltf_animation_mode'] = 'ACTIONS'
+        export_settings['gltf_force_sampling'] = True
+        export_settings['gltf_anim_scene_split_object'] = True
+        export_settings['gltf_anim_slide_to_zero'] = False
+        export_settings['gltf_export_extra_animations'] = False
+        export_settings['gltf_merge_animation'] = 'ACTION'
+        export_settings['gltf_draco_mesh_compression'] = False
+        export_settings['gltf_draco_mesh_compression_level'] = 6
+        export_settings['gltf_draco_position_quantization'] = 14
+        export_settings['gltf_draco_normal_quantization'] = 10
+        export_settings['gltf_draco_texcoord_quantization'] = 12
+        export_settings['gltf_draco_color_quantization'] = 10
+        export_settings['gltf_draco_generic_quantization'] = 12
+        export_settings['gltf_gpu_instances'] = False
+        export_settings['gltf_lights'] = False
+        export_settings['gltf_lighting_mode'] = 'SPEC'
+        export_settings['gltf_morph'] = True
+        export_settings['gltf_morph_normal'] = True
+        export_settings['gltf_morph_tangent'] = False
+        export_settings['gltf_morph_anim'] = True
+        export_settings['gltf_unused_textures'] = False
+        export_settings['gltf_unused_images'] = False
+        export_settings['gltf_visible'] = False
+        export_settings['gltf_renderable'] = False
+        export_settings['gltf_filedirectory'] = os.path.dirname(export_settings['gltf_filepath']) + '/'
+        export_settings['gltf_texturedirectory'] = export_settings['gltf_filedirectory']
+        export_settings['gltf_keep_original_textures'] = False
+        export_settings['gltf_image_format'] = 'AUTO'
+        export_settings['gltf_add_webp'] = False
+        export_settings['gltf_webp_fallback'] = False
+        export_settings['gltf_image_quality'] = 75
+        export_settings['gltf_copyright'] = ''
+        export_settings['gltf_texcoords'] = True
+        export_settings['gltf_normals'] = True
+        export_settings['gltf_tangents'] = True and export_settings['gltf_normals']
+        export_settings['gltf_loose_edges'] = False
+        export_settings['gltf_loose_points'] = False
+        export_settings['gltf_binary'] = bytearray()
+        export_settings['gltf_binaryfilename'] = '.bin'
+        export_settings['gltf_gn_mesh'] = False
+        export_settings['gltf_rest_position_armature'] = True
+        export_settings['gltf_frame_step'] = 1
+        export_settings['gltf_selected'] = False
+        export_settings['gltf_layers'] = True
+        export_settings['gltf_extras'] = False
+        export_settings['gltf_yup'] = True
+        export_settings['gltf_active_collection'] = False
+        export_settings['gltf_active_collection_with_nested'] = True
+        export_settings['gltf_active_scene'] = False
+        export_settings['gltf_collection'] = ''
+        export_settings['gltf_skins'] = True
+        export_settings['gltf_all_vertex_influences'] = False
+        export_settings['gltf_vertex_influences_nb'] = 4
+        export_settings['gltf_apply'] = False
+        export_settings['gltf_shared_accessors'] = False
+        export_settings['gltf_current_frame'] = False
+        export_settings['gltf_animations'] = True
+        export_settings['gltf_def_bones'] = False
+        export_settings['gltf_materials'] = 'EXPORT'
+        export_settings['gltf_attributes'] = False
+        export_settings['gltf_cameras'] = False
+        export_settings['gltf_loglevel'] = 1
+        export_settings['loglevel'] = logging.INFO
+        export_settings['log'] = Log(export_settings['loglevel'])
+        export_settings['gltf_export_anim_pointer'] = False
+        export_settings['gltf_trs_w_animation_pointer'] = False
+        export_settings['gltf_export_anim_single_armature'] = True
+        export_settings['gltf_vertex_color'] = 'Color'
+        export_settings['gltf_all_vertex_colors'] = True
+        export_settings['gltf_active_vertex_color_when_no_material'] = True
+        export_settings['gltf_bake_animation'] = False
+        export_settings['gltf_negative_frames'] = 'SLIDE'
+        export_settings['gltf_format'] = 'GLB'
+        gltf_data, giant_buffer = gltf2_blender_export(export_settings)
+        model_gltf = GLTF2().from_json(json.dumps(gltf_data), infer_missing=True)
+        model_gltf.set_binary_blob(giant_buffer)
+        try:
+            metadata = lib_fmtibvb.read_struct_from_json(".".join(self.filepath.split('.')[:-1])+".metadata")
+        except:
+            metadata = {}
+        kuro_gltf_to_meshes.process_data(os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath), model_gltf, metadata, True, True)
+        self.report({'INFO'}, f"export to {os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath)}")
+        return {'FINISHED'}
+    
 ########################## Divider ##########################
 class O_ConvertMDL(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.mdl_convert"
     bl_label = "MDL to GLB+BIN"
-    bl_description = "v1.6.5"
+    bl_description = "选取MDL文件，转换为GLB+BIN"
     filename_ext = ".mdl"
     filter_glob: bpy.props.StringProperty(
         default="*.mdl",
@@ -31,8 +141,8 @@ class O_ConvertMDL(bpy.types.Operator, ImportHelper):
 ########################## Divider ##########################
 class O_ExportMDLJson(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.mdl_export_json"
-    bl_label = "MDL export JSON"
-    bl_description = "v1.6.5"
+    bl_label = "MDL提取JSON"
+    bl_description = "选取MDL文件，仅输出2个JSON"
     filename_ext = ".mdl"
     filter_glob: bpy.props.StringProperty(
         default="*.mdl",
@@ -51,10 +161,32 @@ class O_ExportMDLJson(bpy.types.Operator, ImportHelper):
         kuro_mdl_export_meshes.process_mdl(mdl_file, mdl_data, True, False, False, True, True)
         return {'FINISHED'}
 ########################## Divider ##########################
+class O_ExportMDLMetadata(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.mdl_export_metadata"
+    bl_label = "MDL提取metadata"
+    bl_description = "选取MDL文件，仅输出.metadata"
+    filename_ext = ".mdl"
+    filter_glob: bpy.props.StringProperty(
+        default="*.mdl",
+        options={'HIDDEN'},
+    )
+    
+    def execute(self, context):
+        mdl_file = self.filepath
+        if not mdl_file or not os.path.exists(mdl_file):
+            self.report({'ERROR'}, "请选择mdl文件")
+            return {'CANCELLED'}
+            
+        self.report({'INFO'}, f"Processing {mdl_file}")
+        with open(mdl_file, "rb") as f:
+            mdl_data = f.read()
+        kuro_mdl_to_basic_gltf.process_mdl(mdl_file, mdl_data, True, False, False, True, True, False, True)
+        return {'FINISHED'}
+########################## Divider ##########################
 class O_ExportMDL(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.mdl_export"
     bl_label = "MDL to VBIB+JSON"
-    bl_description = "v1.6.5"
+    bl_description = "选取MDL文件，输出VBIB及JSON"
     filename_ext = ".mdl"
     filter_glob: bpy.props.StringProperty(
         default="*.mdl",
@@ -75,8 +207,8 @@ class O_ExportMDL(bpy.types.Operator, ImportHelper):
 ########################## Divider ##########################
 class O_ImportMDL(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.mdl_import"
-    bl_label = "Import MDL as GLB"
-    bl_description = "v1.6.5"
+    bl_label = "导入MDL"
+    bl_description = "将MDL转换为GLB数据并直接导入"
     filename_ext = ".mdl"
     filter_glob: bpy.props.StringProperty(
         default="*.mdl",
@@ -146,7 +278,7 @@ class O_ImportMDL(bpy.types.Operator, ImportHelper):
 class O_GltfToMeshes(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.gltf_to_meshes"
     bl_label = "GLTF to Meshes"
-    bl_description = "v1.6.5"
+    bl_description = "将GLB转换为VB/IB文件"
     filename_ext = ".glb"
     filter_glob: bpy.props.StringProperty(
         default="*.glb;*.gltf",
@@ -171,8 +303,8 @@ class O_GltfToMeshes(bpy.types.Operator, ImportHelper):
 ########################## Divider ##########################
 class O_UpdateMDL(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.mdl_import_vbib"
-    bl_label = "Import VBIB to MDL"
-    bl_description = "v1.6.5"
+    bl_label = "文件夹导入MDL"
+    bl_description = "选取MDL文件，以包含更改后的VBIB及JSON的同名文件夹中的数据更新MDL"
     filename_ext = ".mdl"
     filter_glob: bpy.props.StringProperty(
         default="*.mdl",
@@ -187,14 +319,13 @@ class O_UpdateMDL(bpy.types.Operator, ImportHelper):
             return {'CANCELLED'}
         #encodings = ['utf-8', 'gbk', 'utf-16']
         try:
-            self.report({'INFO'}, f"{mdl_file}")
             with open(mdl_file, "rb") as f:
                 mdl_data = f.read()
-            kuro_mdl_import_meshes.process_mdl(mdl_file, mdl_data, False, 1, nobak)
+            kuro_mdl_import_meshes.process_mdl(mdl_file, mdl_data, self, context, False, 1, nobak)
             #with open(json_file, 'r', newline='', encoding=encoding) as file:
             return {'FINISHED'}
         except Exception as e:
-            self.report({'ERROR'}, f"导入JSON文件时出现错误1: {e}")
+            self.report({'ERROR'}, f"导入文件夹时出现错误: {e}")
             return {'CANCELLED'}
         return {'CANCELLED'}
 ########################## Divider ##########################
@@ -1850,16 +1981,21 @@ class FDK_PT_Snippets_IO(bpy.types.Panel):
         layout = self.layout
         box = layout.box()
         col = box.column(align=True)
-        col.operator(O_ImportMDL.bl_idname, icon="IMPORT")#Import MDL
-        col.prop(context.scene, "usedds", text="贴图后缀使用dds")
-        col.operator(O_ExportMDLJson.bl_idname, icon="IMPORT")#MDL export JSON
+        row = col.row(align=True)
+        row.operator(O_ImportMDL.bl_idname, icon="IMPORT")#Import MDL
+        row.prop(context.scene, "usedds", text="使用dds贴图")
+        col.operator(O_ExportVBIB.bl_idname, icon="EXPORT")#Import MDL
+        row = col.row(align=True)
+        row.operator(O_ExportMDLJson.bl_idname, icon="TRACKING_FORWARDS")#MDL export JSON
+        row.operator(O_ExportMDLMetadata.bl_idname, icon="TRACKING_FORWARDS")#MDL export metadata
         col = box.column(align=True)
-        col.operator(O_UpdateMDL.bl_idname, icon="IMPORT")#Import VBIB to MDL
-        col.prop(context.scene, "do_not_backup", text="不创建bak")
+        row = col.row(align=True)
+        row.operator(O_UpdateMDL.bl_idname, icon="TRACKING_BACKWARDS")#Import VBIB to MDL
+        row.prop(context.scene, "do_not_backup", text="不创建bak")
         col = box.column(align=True)
-        col.operator(O_ExportMDL.bl_idname, icon="IMPORT")#MDL to VBIB
-        col.operator(O_ConvertMDL.bl_idname, icon="IMPORT")#MDL to GLB+BIN
-        col.operator(O_GltfToMeshes.bl_idname, icon="IMPORT")#GLTF to Meshes
+        col.operator(O_ExportMDL.bl_idname, icon="FILE_REFRESH")#MDL to VBIB
+        col.operator(O_ConvertMDL.bl_idname, icon="FILE_REFRESH")#MDL to GLB+BIN
+        col.operator(O_GltfToMeshes.bl_idname, icon="FILE_REFRESH")#GLTF to Meshes
         
         # col.prop(context.scene, "fdk_source_mesh", text="源网格", icon="MESH_DATA")
         # col.prop(context.scene, "fdk_target_mesh", text="目标网格", icon="MESH_DATA")
@@ -1867,9 +2003,11 @@ class FDK_PT_Snippets_IO(bpy.types.Panel):
 ########################## Divider ##########################
 def register():
     # bpy.utils.register_class(O_AssignArmature)
+    bpy.utils.register_class(O_ExportVBIB)
     bpy.utils.register_class(O_ConvertMDL)
     bpy.utils.register_class(O_ExportMDL)
     bpy.utils.register_class(O_ExportMDLJson)
+    bpy.utils.register_class(O_ExportMDLMetadata)
     bpy.utils.register_class(O_GltfToMeshes)
     bpy.utils.register_class(O_ImportMDL)
     bpy.utils.register_class(O_UpdateMDL)
@@ -1965,9 +2103,11 @@ def register():
 
 def unregister():
     # bpy.utils.unregister_class(O_AssignArmature)
+    bpy.utils.unregister_class(O_ExportVBIB)
     bpy.utils.unregister_class(O_ConvertMDL)
     bpy.utils.unregister_class(O_ExportMDL)
     bpy.utils.unregister_class(O_ExportMDLJson)
+    bpy.utils.unregister_class(O_ExportMDLMetadata)
     bpy.utils.unregister_class(O_GltfToMeshes)
     bpy.utils.unregister_class(O_ImportMDL)
     bpy.utils.unregister_class(O_UpdateMDL)

@@ -578,36 +578,38 @@ def process_mdl (mdl_file, mdl_data, complete_maps = complete_vgmaps_default, tr
     if (overwrite == True) or not os.path.exists(mdl_file[:-4]):
         if not os.path.exists(mdl_file[:-4]):
             os.mkdir(mdl_file[:-4])
-        with open(mdl_version_json_filename, 'wb') as f:
-            f.write(json.dumps({'mdl_version': get_kuro_ver(mdl_data)}, indent=4).encode("utf-8"))
-        with open(mesh_json_filename, 'wb') as f:
-            f.write(json.dumps(mesh_struct["mesh_blocks"], indent=4).encode("utf-8"))
+        if jsonOnly == False:
+            with open(mdl_version_json_filename, 'wb') as f:
+                f.write(json.dumps({'mdl_version': get_kuro_ver(mdl_data)}, indent=4).encode("utf-8"))
+            with open(mesh_json_filename, 'wb') as f:
+                f.write(json.dumps(mesh_struct["mesh_blocks"], indent=4).encode("utf-8"))
+            with open(skel_json_filename, 'wb') as f:
+                f.write(json.dumps(skel_struct, indent=4).encode("utf-8"))
         with open(material_json_filename, 'wb') as f:
             f.write(json.dumps(material_struct, indent=4).encode("utf-8"))
         with open(image_json_filename, 'wb') as f:
             f.write(json.dumps(image_list, indent=4).encode("utf-8"))
-        with open(skel_json_filename, 'wb') as f:
-            f.write(json.dumps(skel_struct, indent=4).encode("utf-8"))
-        for i in range(len(mesh_struct["mesh_buffers"])):
-            safe_filename = "".join([x if x not in "\\/:*?<>|" else "_" for x in mesh_struct["mesh_blocks"][i]["name"]])
-            if mesh_struct["mesh_blocks"][i]["node_count"] > 0:
-                node_list = mesh_struct["mesh_blocks"][i]["nodes"]
-            else:
-                node_list = False
-            for j in range(len(mesh_struct["mesh_buffers"][i])):
-                write_fmt_ib_vb(mesh_struct["mesh_buffers"][i][j], mdl_file[:-4] +\
-                    '/{0}_{1}_{2:02d}'.format(i, safe_filename, j),\
-                    node_list = node_list, complete_maps = complete_maps)
-            if "collision_mesh" in mesh_struct["mesh_collision_data"][i]:
-                fmt = mesh_struct["mesh_collision_data"][i]["collision_mesh"]['fmt']
-                write_fmt(fmt, mdl_file[:-4] + '/{0}_{1}_collision.fmt'.format(i, safe_filename))
-                write_ib(mesh_struct["mesh_collision_data"][i]["collision_mesh"]['ib'],
-                    mdl_file[:-4] + '/{0}_{1}_collision.ib'.format(i, safe_filename), fmt)
-                write_vb(mesh_struct["mesh_collision_data"][i]["collision_mesh"]['vb'],
-                    mdl_file[:-4] + '/{0}_{1}_collision.vb'.format(i, safe_filename), fmt)
-            if "collision_map" in mesh_struct["mesh_collision_data"][i] and dump_collision_nodes == True:
-                with open(mdl_file[:-4] + '/{0}_{1}_collision_nodes.json'.format(i, safe_filename), 'wb') as f:
-                    f.write(json.dumps(mesh_struct["mesh_collision_data"][i]["collision_map"], indent=4).encode("utf-8"))
+        if jsonOnly == False:
+            for i in range(len(mesh_struct["mesh_buffers"])):
+                safe_filename = "".join([x if x not in "\\/:*?<>|" else "_" for x in mesh_struct["mesh_blocks"][i]["name"]])
+                if mesh_struct["mesh_blocks"][i]["node_count"] > 0:
+                    node_list = mesh_struct["mesh_blocks"][i]["nodes"]
+                else:
+                    node_list = False
+                for j in range(len(mesh_struct["mesh_buffers"][i])):
+                    write_fmt_ib_vb(mesh_struct["mesh_buffers"][i][j], mdl_file[:-4] +\
+                        '/{0}_{1}_{2:02d}'.format(i, safe_filename, j),\
+                        node_list = node_list, complete_maps = complete_maps)
+                if "collision_mesh" in mesh_struct["mesh_collision_data"][i]:
+                    fmt = mesh_struct["mesh_collision_data"][i]["collision_mesh"]['fmt']
+                    write_fmt(fmt, mdl_file[:-4] + '/{0}_{1}_collision.fmt'.format(i, safe_filename))
+                    write_ib(mesh_struct["mesh_collision_data"][i]["collision_mesh"]['ib'],
+                        mdl_file[:-4] + '/{0}_{1}_collision.ib'.format(i, safe_filename), fmt)
+                    write_vb(mesh_struct["mesh_collision_data"][i]["collision_mesh"]['vb'],
+                        mdl_file[:-4] + '/{0}_{1}_collision.vb'.format(i, safe_filename), fmt)
+                if "collision_map" in mesh_struct["mesh_collision_data"][i] and dump_collision_nodes == True:
+                    with open(mdl_file[:-4] + '/{0}_{1}_collision_nodes.json'.format(i, safe_filename), 'wb') as f:
+                        f.write(json.dumps(mesh_struct["mesh_collision_data"][i]["collision_map"], indent=4).encode("utf-8"))
 
 if __name__ == "__main__":
     # Set current directory
