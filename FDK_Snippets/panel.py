@@ -109,8 +109,11 @@ class O_ExportVBIB(bpy.types.Operator, ExportHelper):
         model_gltf = GLTF2().from_json(json.dumps(gltf_data), infer_missing=True)
         model_gltf.set_binary_blob(giant_buffer)
         try:
+            self.report({'INFO'}, f"load{".".join(self.filepath.split('.')[:-1])+".metadata"}")
             metadata = lib_fmtibvb.read_struct_from_json(".".join(self.filepath.split('.')[:-1])+".metadata")
-        except:
+            self.report({'INFO'}, "metadata valid")
+        except Exception as e:
+            self.report({'ERROR'}, f"导入metadata文件时出现错误: {e}")
             metadata = {}
         kuro_gltf_to_meshes.process_data(os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath), model_gltf, metadata, True, True)
         self.report({'INFO'}, f"export to {os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath)}")
