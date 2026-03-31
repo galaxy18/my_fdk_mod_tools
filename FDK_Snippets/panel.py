@@ -8,16 +8,70 @@ from .io_scene_gltf2.io.imp.gltf2_io_gltf import glTFImporter
 from .io_scene_gltf2.io.com.gltf2_io import Gltf, gltf_from_dict
 from .io_scene_gltf2.blender.exp.export import __export as gltf2_blender_export
 ########################## Divider ##########################
-class O_ExportVBIB(bpy.types.Operator, ExportHelper):
+class O_CheckMaterials(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.check_materials"
+    bl_label = "比对material_info"
+    bl_description = "选择包含material_info的文件夹，对比工作区的材质和json中的材质是否一致"
+    directory: bpy.props.StringProperty(
+        name="Outdir Path",
+        description="Where I will save my stuff"
+        # subtype='DIR_PATH' is not needed to specify the selection mode.
+        # But this will be anyway a directory path.
+        )
+    filter_folder: bpy.props.BoolProperty(
+        default=True,
+        options={"HIDDEN"}
+        )
+    
+    def execute(self, context):
+        try:
+            materials = lib_fmtibvb.read_struct_from_json(self.directory+"/material_info.json")
+        except Exception as e:
+            self.report({'ERROR'}, f"导入material_info.json文件时出现错误: {e}")
+            return {'CANCELLED'}
+            
+        json_material=[]
+        for material in materials:
+            #self.report({'INFO'}, f"material1:{material["material_name"]}")
+            json_material.append(material["material_name"])
+        hasmissing=False
+        for material in bpy.data.materials:
+            if not material.name in json_material:
+                self.report({'INFO'}, f"请将材质定义添加至material_info.json中:{material.name}")
+                hasmissing = True
+        if hasmissing==False:
+            self.report({'INFO'}, f"没有缺少的材质定义")
+            ShowMessageBox(f"没有缺少的材质定义")
+        else:
+            ShowMessageBox(f"请检查输出窗口，将缺少的材质添加到material_info.json")
+        self.report({'INFO'}, f"O_CheckMaterials FINISHED")
+        return {'FINISHED'}
+        
+def ShowMessageBox(message = "", title = "Message Box", icon = 'INFO'):
+    def draw(self, context):
+        self.layout.label(text=message)
+    bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
+########################## Divider ##########################
+class O_ExportVBIB(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.export_to_vbib"
     bl_label = "导出文件夹"
-    bl_description = "输出VBIB及JSON"
-    filename_ext = ".*"
-    filter_glob: bpy.props.StringProperty(
-        default="bpy.context.blend_data.filepath.*",
-        options={'HIDDEN'},
-        maxlen=255,  # Max internal buffer length, longer would be clamped.
-    )
+    bl_description = "选择文件夹，在其中输出VBIB及JSON"
+    #filename_ext = ".*"
+    #filter_glob: bpy.props.StringProperty(
+    #    default="bpy.context.blend_data.filepath.*",
+    #    options={'HIDDEN'},
+    #    maxlen=255,  # Max internal buffer length, longer would be clamped.
+    #)
+    directory: bpy.props.StringProperty(
+        name="Outdir Path",
+        description="Where I will save my stuff"
+        # subtype='DIR_PATH' is not needed to specify the selection mode.
+        # But this will be anyway a directory path.
+        )
+    filter_folder: bpy.props.BoolProperty(
+        default=True,
+        options={"HIDDEN"}
+        )
     
     def execute(self, context):
         from .io_scene_gltf2.io.com.debug import Log
@@ -25,7 +79,7 @@ class O_ExportVBIB(bpy.types.Operator, ExportHelper):
         import logging
         
         export_settings = self.as_keywords()
-        export_settings['gltf_filepath'] = self.filepath
+        export_settings['gltf_filepath'] = self.directory
         export_settings['gltf_user_extensions'] = []
         export_settings['gltf_hierarchy_full_collections'] = False
         export_settings['gltf_armature_object_remove'] = False
@@ -33,7 +87,6 @@ class O_ExportVBIB(bpy.types.Operator, ExportHelper):
         export_settings['gltf_flatten_obj_hierarchy'] = False
         export_settings['gltf_leaf_bone'] = False
         export_settings['gltf_animation_mode'] = 'ACTIONS'
-        export_settings['gltf_force_sampling'] = True
         export_settings['gltf_anim_scene_split_object'] = True
         export_settings['gltf_anim_slide_to_zero'] = False
         export_settings['gltf_export_extra_animations'] = False
@@ -74,6 +127,13 @@ class O_ExportVBIB(bpy.types.Operator, ExportHelper):
         export_settings['gltf_gn_mesh'] = False
         export_settings['gltf_rest_position_armature'] = True
         export_settings['gltf_frame_step'] = 1
+        export_settings['gltf_frame_range'] = False
+        export_settings['gltf_force_sampling'] = True
+        export_settings['gltf_sampling_interpolation_fallback'] = 'LINEAR'
+        export_settings['gltf_optimize_animation'] = True
+        export_settings['gltf_optimize_animation_keep_armature'] = True
+        export_settings['gltf_optimize_animation_keep_object'] = False
+        export_settings['gltf_optimize_disable_viewport'] = False
         export_settings['gltf_selected'] = False
         export_settings['gltf_layers'] = True
         export_settings['gltf_extras'] = False
@@ -108,15 +168,18 @@ class O_ExportVBIB(bpy.types.Operator, ExportHelper):
         gltf_data, giant_buffer = gltf2_blender_export(export_settings)
         model_gltf = GLTF2().from_json(json.dumps(gltf_data), infer_missing=True)
         model_gltf.set_binary_blob(giant_buffer)
+        metadata = {}
         try:
-            self.report({'INFO'}, f"load{".".join(self.filepath.split('.')[:-1])+".metadata"}")
-            metadata = lib_fmtibvb.read_struct_from_json(".".join(self.filepath.split('.')[:-1])+".metadata")
-            self.report({'INFO'}, "metadata valid")
+            #self.report({'INFO'}, f"load{".".join(self.filepath.split('.')[:-1])+".metadata"}")
+            self.report({'INFO'}, f"load{os.path.dirname(self.directory)+".metadata"}")
+            #metadata = lib_fmtibvb.read_struct_from_json(".".join(self.filepath.split('.')[:-1])+".metadata")
+            metadata = lib_fmtibvb.read_struct_from_json(os.path.dirname(self.directory)+".metadata")
         except Exception as e:
-            self.report({'ERROR'}, f"导入metadata文件时出现错误: {e}")
-            metadata = {}
-        kuro_gltf_to_meshes.process_data(os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath), model_gltf, metadata, True, True)
-        self.report({'INFO'}, f"export to {os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath)}")
+            self.report({'ERROR'}, f"文件不存在: {e}。将忽略metadata。")
+        #kuro_gltf_to_meshes.process_data(os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath), model_gltf, metadata, True, True)
+        kuro_gltf_to_meshes.process_data(self.filepath, model_gltf, metadata, True, True)
+        #self.report({'INFO'}, f"export to {os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath)}")
+        self.report({'INFO'}, f"export to {self.filepath}")
         return {'FINISHED'}
     
 ########################## Divider ##########################
@@ -1871,14 +1934,13 @@ class FDK_PT_Snippets_FGOA(bpy.types.Panel):
                 else:
                     col.label(text="选择源网格才能合并")
         
-        
         O_CopyBonerow = col.row(align=True)
         O_CopyBonerow.operator(O_attach_Armatures.bl_idname, text=O_attach_Armatures.bl_label, icon="ARMATURE_DATA")
         O_CopyBonerow.operator(O_attach_Armatures2.bl_idname, text=O_attach_Armatures2.bl_label, icon="ARMATURE_DATA")
         col.enabled = (not sel_obj is None) and (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")
         
         child_row = col.row(align=True)
-        if not (bpy.context.object.mode == 'EDIT' and len(bpy.context.selected_editable_bones) ==2):
+        if not (bpy.context.object.mode == 'EDIT' and bpy.context.selected_editable_bones != None and len(bpy.context.selected_editable_bones) ==2):
             child_row.enabled = False
         child_row.operator(O_copy_Bone_Pos.bl_idname, text=O_copy_Bone_Pos.bl_label, icon="COPYDOWN")
         child_row.operator(O_copy_Bone_Pos2.bl_idname, text=O_copy_Bone_Pos2.bl_label, icon="COPYDOWN")
@@ -1987,14 +2049,22 @@ class FDK_PT_Snippets_IO(bpy.types.Panel):
         row = col.row(align=True)
         row.operator(O_ImportMDL.bl_idname, icon="IMPORT")#Import MDL
         row.prop(context.scene, "usedds", text="使用dds贴图")
-        col.operator(O_ExportVBIB.bl_idname, icon="EXPORT")#Import MDL
+        col.operator(O_ExportVBIB.bl_idname, icon="EXPORT")#Export VBIB
         row = col.row(align=True)
         row.operator(O_ExportMDLJson.bl_idname, icon="TRACKING_FORWARDS")#MDL export JSON
         row.operator(O_ExportMDLMetadata.bl_idname, icon="TRACKING_FORWARDS")#MDL export metadata
+        
+        box = layout.box()
         col = box.column(align=True)
         row = col.row(align=True)
         row.operator(O_UpdateMDL.bl_idname, icon="TRACKING_BACKWARDS")#Import VBIB to MDL
         row.prop(context.scene, "do_not_backup", text="不创建bak")
+        
+        box = layout.box()
+        col = box.column(align=True)
+        col.operator(O_CheckMaterials.bl_idname, icon="MATERIAL")#Compare Material JSON
+        
+        box = layout.box()
         col = box.column(align=True)
         col.operator(O_ExportMDL.bl_idname, icon="FILE_REFRESH")#MDL to VBIB
         col.operator(O_ConvertMDL.bl_idname, icon="FILE_REFRESH")#MDL to GLB+BIN
@@ -2014,6 +2084,7 @@ def register():
     bpy.utils.register_class(O_GltfToMeshes)
     bpy.utils.register_class(O_ImportMDL)
     bpy.utils.register_class(O_UpdateMDL)
+    bpy.utils.register_class(O_CheckMaterials)
     
     bpy.utils.register_class(O_ImportJSON)
     bpy.utils.register_class(O_ImportRenameJSON)
@@ -2114,6 +2185,7 @@ def unregister():
     bpy.utils.unregister_class(O_GltfToMeshes)
     bpy.utils.unregister_class(O_ImportMDL)
     bpy.utils.unregister_class(O_UpdateMDL)
+    bpy.utils.unregister_class(O_CheckMaterials)
     
     bpy.utils.unregister_class(O_ImportJSON)
     bpy.utils.unregister_class(O_ImportRenameJSON)
