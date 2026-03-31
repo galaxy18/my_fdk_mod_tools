@@ -30,14 +30,30 @@ class O_CheckMaterials(bpy.types.Operator, ImportHelper):
             self.report({'ERROR'}, f"导入material_info.json文件时出现错误: {e}")
             return {'CANCELLED'}
             
-        json_material=[]
+        json_material=["Dots Stroke"]
         for material in materials:
             #self.report({'INFO'}, f"material1:{material["material_name"]}")
             json_material.append(material["material_name"])
         hasmissing=False
-        for material in bpy.data.materials:
-            if not material.name in json_material:
-                self.report({'INFO'}, f"请将材质定义添加至material_info.json中:{material.name}")
+        for mat in bpy.data.materials:
+            if not mat.name in json_material:
+                self.report({'INFO'}, f"缺少的材质:")
+                self.report({'INFO'}, f"    {mat.name}")
+                for node in mat.node_tree.nodes:
+                        for slot_base_color in node.inputs:
+                            if slot_base_color.type == "RGBA" and slot_base_color.is_linked:
+                                node_base_color = slot_base_color.links[0].from_node
+                                if node_base_color.type == "MIX":
+                                    for slot_base_color2 in node_base_color.inputs:
+                                        if slot_base_color2.is_linked:
+                                            node_base_color2 = slot_base_color2.links[0].from_node
+                                            if node_base_color2.type == 'TEX_IMAGE':
+                                                self.report({'INFO'}, f"        {node_base_color2.image.name}")
+                                elif not node_base_color.type == "VERTEX_COLOR":
+                                    try:
+                                        self.report({'INFO'}, f"        {node_base_color.image.name}")
+                                    except:
+                                        self.report({'ERROR'},f"        exception:{node_base_color.type}")
                 hasmissing = True
         if hasmissing==False:
             self.report({'INFO'}, f"没有缺少的材质定义")
