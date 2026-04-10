@@ -100,16 +100,17 @@ def build_skeleton_section (skel_struct):
         output_buffer += struct.pack("<{}I".format(len(skel_struct[i]['children'])), *skel_struct[i]['children'])
     return(struct.pack("<2I", 2, len(output_buffer)) + output_buffer)
 
-def build_material_section (self, context, mdl_filename, material_list = [], kuro_ver = 1):
+def build_material_section (self, context, mdl_filename, material_list = [], kuro_ver = 1, raw_material_struct = None):
     # Will read data from JSON file, or load original data from the mdl file if JSON is missing
-    try:
-        raw_material_struct = read_struct_from_json(mdl_filename + "/material_info.json")
-    except:
-        print("{0}/material_info.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_filename))
-        with open(mdl_filename + '.mdl', "rb") as f:
-            mdl_data = f.read()
-        mdl_data = decryptCLE(mdl_data)
-        raw_material_struct = obtain_material_data(mdl_data)
+    if raw_material_struct is None:
+        try:
+            raw_material_struct = read_struct_from_json(mdl_filename + "/material_info.json")
+        except:
+            print("{0}/material_info.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_filename))
+            with open(mdl_filename + '.mdl', "rb") as f:
+                mdl_data = f.read()
+            mdl_data = decryptCLE(mdl_data)
+            raw_material_struct = obtain_material_data(mdl_data)
     material_struct = []
     try:
         materials = [x['material_name'] for x in raw_material_struct]

@@ -1,5 +1,4 @@
-import bpy,os,json
-import mathutils,math,numpy,copy
+import bpy,os,json,shutil,mathutils,math,numpy,copy
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 from mathutils import Vector,Quaternion
 from .KuroMDLTools import kuro_mdl_to_basic_gltf, kuro_mdl_import_meshes, kuro_mdl_export_meshes, kuro_gltf_to_meshes, lib_fmtibvb
@@ -8,6 +7,302 @@ from .io_scene_gltf2.io.imp.gltf2_io_gltf import glTFImporter
 from .io_scene_gltf2.io.com.gltf2_io import Gltf, gltf_from_dict
 from .io_scene_gltf2.blender.exp.export import __export as gltf2_blender_export
 ########################## Divider ##########################
+#https://sinestesia.co/blog/tutorials/using-uilists-in-blender/
+class TextureItem(bpy.types.PropertyGroup):
+    texture_image_name:bpy.props.StringProperty(
+        description="",
+        default="")
+    texture_slot:bpy.props.IntProperty(
+        description="",
+        default=0)
+    
+class MaterialListItem(bpy.types.PropertyGroup):
+    ref_name:bpy.props.StringProperty(
+        description="",
+        default="")
+    enabled:bpy.props.BoolProperty(
+        default=True,
+        options={"HIDDEN"}
+        )
+    id_referenceonly:bpy.props.StringProperty(
+        description="",
+        default="-1")
+    material_name:bpy.props.StringProperty(
+        description="",
+        default="")
+    textures:bpy.props.CollectionProperty(type = TextureItem)
+    value:bpy.props.StringProperty(
+        description="",
+        default="")
+
+class MetadataListItem(bpy.types.PropertyGroup):
+    enabled:bpy.props.BoolProperty(
+        default=False,
+        options={"HIDDEN"}
+        )
+    metadata_name:bpy.props.StringProperty(
+        description="",
+        default="")
+    value:bpy.props.StringProperty(
+        description="",
+        default="{}")
+
+class P_UL_Material_List(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        custom_icon = 'OBJECT_DATAMODE'
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            layout.label(text=f"{item.ref_name.replace("_material_struct", "")}", icon = custom_icon)
+            layout.label(text=f"{item.id_referenceonly}-{item.material_name}")
+            layout.prop(item, "enabled", text="")
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label(text="", icon = custom_icon)
+
+class P_UL_Metadata_List(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        custom_icon = 'OBJECT_DATAMODE'
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            layout.label(text=f"{item.metadata_name.replace("_gltf_metadata", "")}", icon = custom_icon)
+            #layout.prop(item, "enabled", text="")
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label(text="", icon = custom_icon)
+            
+class LIST_OT_SelectAll(bpy.types.Operator):
+    bl_idname = "my_list.select_all"
+    bl_label = "unselect all"
+    def execute(self, context):
+        for item in context.scene.my_list:
+            item.enabled = True
+        return{'FINISHED'}
+        
+class LIST_OT_UnselectAll(bpy.types.Operator):
+    bl_idname = "my_list.unselect_all"
+    bl_label = "unselect all"
+    def execute(self, context):
+        for item in context.scene.my_list:
+            item.enabled = False
+        return{'FINISHED'}
+        
+class LIST_OT_CopyItem(bpy.types.Operator):
+    bl_idname = "my_list.copy_item"
+    bl_label = "Add a new item"
+    def execute(self, context):
+        my_item = context.scene.my_list.add()
+        item = context.scene.my_list[context.scene.list_index]
+        my_item.id_referenceonly = f"{len(bpy.context.scene.my_list)}"
+        my_item.material_name = f"{item["material_name"]}_1"
+        my_item.value = item["value"]
+        for texture in item.textures:
+            my_texture = my_item.textures.add()
+            my_texture.texture_slot = texture.texture_slot
+            my_texture.texture_image_name = texture.texture_image_name
+        return{'FINISHED'}
+        
+class LIST_OT_ExportItem(bpy.types.Operator, ImportHelper):
+    bl_idname = "my_list.export_item"
+    bl_label = "Export"
+    directory: bpy.props.StringProperty(
+        name="Outdir Path",
+        description="Where I will save my stuff"
+        # subtype='DIR_PATH' is not needed to specify the selection mode.
+        # But this will be anyway a directory path.
+        )
+    filter_folder: bpy.props.BoolProperty(
+        default=True,
+        options={"HIDDEN"}
+        )
+    
+    def collectmaterial(self, context):
+        material_json = []
+        for item in context.scene.my_list:
+            if item.enabled == True:
+                my_item = json.loads(item["value"])
+                my_item["id_referenceonly"] = item["id_referenceonly"]
+                my_item["material_name"] = item["material_name"]
+                idx=0
+                for texture in item.textures:
+                    my_item["textures"][idx]["texture_image_name"] = texture.texture_image_name
+                    idx=idx+1
+                material_json.append(my_item)
+        #print("material_json")
+        #print(json.dumps(material_json, indent=4))
+        return material_json
+        
+    def collectmetadata(self, context):
+        item = context.scene.metadata_list[context.scene.metadata_index]
+        gltf_metadata = json.loads(item.value)
+        #print("metadata")
+        #print(json.dumps(gltf_metadata, indent=4))
+        return gltf_metadata
+        
+    def execute(self, context):
+        material_json = self.collectmaterial(context)
+        gltf_metadata = self.collectmetadata(context)
+        print(self.directory)
+        with open(self.directory + '/material_info.json', 'wb') as f:
+            f.write(json.dumps(material_json, indent=4).encode("utf-8"))
+        with open(os.path.dirname(self.directory)+'.metadata', 'wb') as f:
+	        f.write(json.dumps(gltf_metadata, indent=4).encode("utf-8"))
+            
+        return{'FINISHED'}
+        
+class LIST_OT_DeleteItem(bpy.types.Operator):
+    bl_idname = "my_list.delete_item"
+    bl_label = "Deletes an item"
+    @classmethod
+    def poll(cls, context):
+        return context.scene.my_list
+    def execute(self, context):
+        my_list = context.scene.my_list
+        index = context.scene.list_index
+        my_list.remove(index)
+        context.scene.list_index = min(max(0, index - 1), len(my_list) - 1)
+        return{'FINISHED'}
+        
+class LIST_OT_MoveItem(bpy.types.Operator):
+    bl_idname = "my_list.move_item"
+    bl_label = "Move an item in the list"
+    direction: bpy.props.EnumProperty(items=(('UP', 'Up', ""), ('DOWN', 'Down', ""),))
+    @classmethod
+    def poll(cls, context):
+        return context.scene.my_list
+    def move_index(self):
+        index = bpy.context.scene.list_index
+        list_length = len(bpy.context.scene.my_list) - 1 # (index starts at 0)
+        new_index = index + (-1 if self.direction == 'UP' else 1)
+        bpy.context.scene.list_index = max(0, min(new_index, list_length))
+    def execute(self, context):
+        my_list = context.scene.my_list
+        index = context.scene.list_index
+        neighbor = index + (-1 if self.direction == 'UP' else 1)
+        my_list.move(neighbor, index)
+        self.move_index()
+        return{'FINISHED'}
+        
+class LIST_OT_LoadItem(bpy.types.Operator):
+    bl_idname = "my_list.load_item"
+    bl_label = ""
+    def execute(self, context):
+        if context.scene.get("kuromdlmetadata") is None:
+            print('')
+        else:
+            context.scene.my_list.clear()
+            context.scene.metadata_list.clear()
+            my_item = context.scene.metadata_list.add()
+            my_item.metadata_name = "（无）"
+            for entry in json.loads(context.scene["kuromdlmetadata"]):
+                for key in entry.keys():
+                    if entry[key]["type"] == "material_struct":
+                        for material in entry[key]["data"]:
+                            my_item = context.scene.my_list.add()
+                            my_item.ref_name = f"{key}"
+                            my_item.id_referenceonly = f"{material["id_referenceonly"]}"
+                            my_item.material_name = f"{material["material_name"]}"
+                            for texture in material["textures"]:
+                                my_texture = my_item.textures.add()
+                                my_texture.texture_slot = texture["texture_slot"]
+                                my_texture.texture_image_name = texture["texture_image_name"]
+                            my_item.value = json.dumps(material, indent=4)
+                    else:
+                        my_item = context.scene.metadata_list.add()
+                        my_item.metadata_name = key
+                        my_item.value = json.dumps(entry[key]["data"], indent=4)
+                        
+        return{'FINISHED'}
+    
+class HelloWorldPanel(bpy.types.Panel):
+    bl_idname = "KuroMDLInfos"
+    bl_label = "KuroMDL infos"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "FDK_Snippets"
+    
+    #bl_space_type = 'PROPERTIES'
+    #bl_region_type = 'WINDOW'
+    #bl_context = "scene"
+    
+    @classmethod
+    def poll(cls, context):
+        return True
+        
+    def draw(self, context):
+        layout = self.layout
+        if bpy.context.scene.get("kuromdlmetadata") is None:
+            print('')
+        else:
+            localstorage = json.loads(bpy.context.scene["kuromdlmetadata"])
+            scene = context.scene
+            
+            box = layout.box()
+            row = box.row()
+            row.operator('my_list.load_item', text='重新加载')
+            row.operator('my_list.export_item', text='输出')
+            row.label(text='')
+            
+            box = layout.box()
+            row = box.row()
+            row.label(text='材质')
+            row = box.row()
+            row.template_list("P_UL_Material_List", "The_List", scene, "my_list", scene, "list_index")
+            row = box.row()
+            row.label(text='')
+            row.operator('my_list.select_all', text='全选')
+            row.operator('my_list.unselect_all', text='全不选')
+            row.operator('my_list.copy_item', text='复制')
+            #row.operator('my_list.move_item', text='UP').direction = 'UP'
+            #row.operator('my_list.move_item', text='DOWN').direction = 'DOWN'
+            
+            if scene.list_index >= 0 and scene.my_list:
+                item = scene.my_list[scene.list_index]
+                #box = layout.box()
+                col = box.column(align=True)
+                col.prop(item, "material_name", text=f"id:{item.id_referenceonly}")
+                for texture in item.textures:
+                    col.prop(texture, "texture_image_name", text=f"slot: {texture.texture_slot}")
+                col = box.column(align=True)
+                col.prop(item, "value")
+            
+            #for entry in localstorage:
+                #for key in entry.keys():
+                    #if entry[key]["type"] == "material_struct":
+                        #for material in entry[key]["data"]:
+                            #row = col.row(align=True)
+                            #row.label(text=f"{material["id_referenceonly"]}")
+                            #row.label(text=material["material_name"])
+                            #row.label(text=json.dumps(material))
+                            #row = layout.row(align=True)
+                            #row.label(text=entry.name)
+                            #row.prop(entry, "value", text="")
+                            #localstorage[0]["c0010_gltf_metadata"]
+                            
+            box = layout.box()
+            row = box.row()
+            row.label(text='元数据')
+            row = box.row()
+            row.template_list("P_UL_Metadata_List", "The_List2", scene, "metadata_list", scene, "metadata_index")
+            
+            if scene.metadata_index >= 0 and scene.metadata_list:
+                item = scene.metadata_list[scene.metadata_index]
+                #box = layout.box()
+                col = box.column(align=True)
+                col.label(text=f"{item.metadata_name}")
+                col.prop(item, "value")
+########################## Divider ##########################
+class O_CheckMaterialsLocal(bpy.types.Operator):
+    bl_idname = "fdktools.check_materials_local"
+    bl_label = "比对material_info💡"
+    bl_description = "对比工作区的材质和选取的是否一致"
+    
+    def execute(self, context):
+        hasmissing = O_CheckMaterials.processdata(self, context)
+        if hasmissing==False:
+            ShowMessageBox(f"没有缺少的材质定义")
+        else:
+            ShowMessageBox(f"请检查输出窗口，将缺少的材质添加到material_info.json")
+        self.report({'INFO'}, f"O_CheckMaterialsLocal FINISHED")
+        return {'FINISHED'}
+    
 class O_CheckMaterials(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.check_materials"
     bl_label = "比对material_info"
@@ -29,7 +324,29 @@ class O_CheckMaterials(bpy.types.Operator, ImportHelper):
         except Exception as e:
             self.report({'ERROR'}, f"导入material_info.json文件时出现错误: {e}")
             return {'CANCELLED'}
-            
+        hasmissing = self.processdata(context, materials)
+        if hasmissing==False:
+            ShowMessageBox(f"没有缺少的材质定义")
+        else:
+            ShowMessageBox(f"请检查输出窗口，将缺少的材质添加到material_info.json")
+        self.report({'INFO'}, f"O_CheckMaterials FINISHED")
+        return {'FINISHED'}
+    
+    def processdata(self, context, materials=[]):
+        compare_local=context.scene.compare_local
+        if compare_local == True:
+            material_json = []
+            for item in context.scene.my_list:
+                if item.enabled == True:
+                    my_item = json.loads(item["value"])
+                    my_item["id_referenceonly"] = item["id_referenceonly"]
+                    my_item["material_name"] = item["material_name"]
+                    idx=0
+                    for texture in item.textures:
+                        my_item["textures"][idx]["texture_image_name"] = texture.texture_image_name
+                        idx=idx+1
+                    material_json.append(my_item)
+            materials = material_json
         json_material=["Dots Stroke"]
         for material in materials:
             #self.report({'INFO'}, f"material1:{material["material_name"]}")
@@ -55,14 +372,8 @@ class O_CheckMaterials(bpy.types.Operator, ImportHelper):
                                     except:
                                         self.report({'ERROR'},f"        exception:{node_base_color.type}")
                 hasmissing = True
-        if hasmissing==False:
-            self.report({'INFO'}, f"没有缺少的材质定义")
-            ShowMessageBox(f"没有缺少的材质定义")
-        else:
-            ShowMessageBox(f"请检查输出窗口，将缺少的材质添加到material_info.json")
-        self.report({'INFO'}, f"O_CheckMaterials FINISHED")
-        return {'FINISHED'}
-        
+        return hasmissing
+
 def ShowMessageBox(message = "", title = "Message Box", icon = 'INFO'):
     def draw(self, context):
         self.layout.label(text=message)
@@ -70,7 +381,7 @@ def ShowMessageBox(message = "", title = "Message Box", icon = 'INFO'):
 ########################## Divider ##########################
 class O_ExportVBIB(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.export_to_vbib"
-    bl_label = "导出文件夹"
+    bl_label = "导出文件夹💡"
     bl_description = "选择文件夹，在其中输出VBIB及JSON"
     #filename_ext = ".*"
     #filter_glob: bpy.props.StringProperty(
@@ -90,12 +401,15 @@ class O_ExportVBIB(bpy.types.Operator, ImportHelper):
         )
     
     def execute(self, context):
+        self.export(context, self.directory)
+        return {'FINISHED'}
+        
+    def export(self, context, directory):
         from .io_scene_gltf2.io.com.debug import Log
         from pygltflib import GLTF2
         import logging
-        
         export_settings = self.as_keywords()
-        export_settings['gltf_filepath'] = self.directory
+        export_settings['gltf_filepath'] = directory
         export_settings['gltf_user_extensions'] = []
         export_settings['gltf_hierarchy_full_collections'] = False
         export_settings['gltf_armature_object_remove'] = False
@@ -185,19 +499,27 @@ class O_ExportVBIB(bpy.types.Operator, ImportHelper):
         model_gltf = GLTF2().from_json(json.dumps(gltf_data), infer_missing=True)
         model_gltf.set_binary_blob(giant_buffer)
         metadata = {}
-        try:
-            #self.report({'INFO'}, f"load{".".join(self.filepath.split('.')[:-1])+".metadata"}")
-            self.report({'INFO'}, f"load{os.path.dirname(self.directory)+".metadata"}")
-            #metadata = lib_fmtibvb.read_struct_from_json(".".join(self.filepath.split('.')[:-1])+".metadata")
-            metadata = lib_fmtibvb.read_struct_from_json(os.path.dirname(self.directory)+".metadata")
-        except Exception as e:
-            self.report({'ERROR'}, f"文件不存在: {e}。将忽略metadata。")
+        if context.scene.compare_local == True:
+            if len(context.scene.metadata_list) > context.scene.metadata_index:
+                metadata = LIST_OT_ExportItem.collectmetadata(self, context)
+            else:
+                self.report({'ERROR'}, f"数据不存在: {e}。将忽略metadata。")
+            if len(context.scene.my_list) > 0:
+                material_json = LIST_OT_ExportItem.collectmaterial(self, context)
+                with open(directory + '/material_info.json', 'wb') as f:
+                    f.write(json.dumps(material_json, indent=4).encode("utf-8"))
+        else:
+            try:
+                #self.report({'INFO'}, f"load{".".join(self.filepath.split('.')[:-1])+".metadata"}")
+                self.report({'INFO'}, f"load{os.path.dirname(directory)+".metadata"}")
+                #metadata = lib_fmtibvb.read_struct_from_json(".".join(self.filepath.split('.')[:-1])+".metadata")
+                metadata = lib_fmtibvb.read_struct_from_json(os.path.dirname(directory)+".metadata")
+            except Exception as e:
+                self.report({'ERROR'}, f"文件不存在: {e}。将忽略metadata。")
         #kuro_gltf_to_meshes.process_data(os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath), model_gltf, metadata, True, True)
-        kuro_gltf_to_meshes.process_data(self.filepath, model_gltf, metadata, True, True)
+        kuro_gltf_to_meshes.process_data(directory, model_gltf, metadata, True, True)
         #self.report({'INFO'}, f"export to {os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath)}")
-        self.report({'INFO'}, f"export to {self.filepath}")
-        return {'FINISHED'}
-    
+        self.report({'INFO'}, f"export to {directory}")
 ########################## Divider ##########################
 class O_ConvertMDL(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.mdl_convert"
@@ -298,6 +620,7 @@ class O_ImportMDL(bpy.types.Operator, ImportHelper):
     )
     
     def execute(self, context):
+        import sys
         usedds=context.scene.usedds
         mdl_file = self.filepath
         if not mdl_file or not os.path.exists(mdl_file):
@@ -307,11 +630,24 @@ class O_ImportMDL(bpy.types.Operator, ImportHelper):
         self.report({'INFO'}, f"Processing {mdl_file}")
         with open(mdl_file, "rb") as f:
             mdl_data = f.read()
-        gltf_data, giant_buffer = kuro_mdl_to_basic_gltf.process_mdl(mdl_file, mdl_data, True, False, False, True, False, usedds)
         
+        material_struct = kuro_mdl_export_meshes.obtain_material_data(mdl_data)
+        gltf_data, giant_buffer, gltf_metadata = kuro_mdl_to_basic_gltf.process_mdl(mdl_file, mdl_data, True, False, False, True, False, usedds)
+        
+        if bpy.context.scene.get("kuromdlmetadata") is None:
+            bpy.context.scene["kuromdlmetadata"] = "[]"
+        
+        localstorage = json.loads(bpy.context.scene["kuromdlmetadata"]);
+        localstorage.append({
+            f"{bpy.path.display_name_from_filepath(mdl_file)}_material_struct":{"data":material_struct,"type":'material_struct'},
+            f"{bpy.path.display_name_from_filepath(mdl_file)}_gltf_metadata":{"data":gltf_metadata,"type":'gltf_metadata'}
+        })
+        
+        bpy.context.scene["kuromdlmetadata"] = json.dumps(localstorage)
+        LIST_OT_LoadItem.execute(self, context)
+        #return {'FINISHED'}
         import_settings = self.as_keywords()
         user_extensions = []
-        import sys
         preferences = bpy.context.preferences
         for addon_name in preferences.addons.keys():
             try:
@@ -385,17 +721,20 @@ class O_GltfToMeshes(bpy.types.Operator, ImportHelper):
 ########################## Divider ##########################
 class O_UpdateMDL(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.mdl_import_vbib"
-    bl_label = "文件夹导入MDL"
+    bl_label = "文件夹导入MDL💡"
     bl_description = "选取MDL文件，以包含更改后的VBIB及JSON的同名文件夹中的数据更新MDL"
     filename_ext = ".mdl"
     filter_glob: bpy.props.StringProperty(
-        default="*.mdl",
+        default="*.mdl;*.mdl.bak*",
         options={'HIDDEN'},
     )
     
     def execute(self, context):
         nobak=context.scene.do_not_backup
+        compare_local=context.scene.compare_local
         mdl_file = self.filepath
+        kuro_ver = 1
+        change_compression = False
         if not mdl_file or not os.path.exists(mdl_file):
             self.report({'ERROR'}, "请选择mdl文件")
             return {'CANCELLED'}
@@ -403,11 +742,51 @@ class O_UpdateMDL(bpy.types.Operator, ImportHelper):
         try:
             with open(mdl_file, "rb") as f:
                 mdl_data = f.read()
-            kuro_mdl_import_meshes.process_mdl(mdl_file, mdl_data, self, context, False, 1, nobak)
-            #with open(json_file, 'r', newline='', encoding=encoding) as file:
+            if compare_local == False:
+                kuro_mdl_import_meshes.process_mdl(mdl_file, mdl_data, self, context, change_compression, kuro_ver, nobak)
+                #with open(json_file, 'r', newline='', encoding=encoding) as file:
+            else:
+                hasmissing = O_CheckMaterials.processdata(self, context)
+                if hasmissing==True:
+                    ShowMessageBox(f"操作已中断，请检查输出窗口，添加缺少的材质")
+                    return {'CANCELLED'}
+                else:
+                    if mdl_data[0:4] in [b"F9BA", b"C9BA", b"D9BA"]:
+                        compressed = True
+                        mdl_data = decryptCLE(mdl_data)
+                    else:
+                        compressed = False
+                    if kuro_mdl_export_meshes.obtain_material_data(mdl_data) == False:
+                        print("Skipping {0} as it is not a model file.".format(mdl_file))
+                        return False
+                        
+                    if not os.path.exists(mdl_file[:-4]):
+                        os.mkdir(mdl_file[:-4])
+                        O_ExportVBIB.export(self, context, mdl_file[:-4])
+                        
+                    skeleton_data = kuro_mdl_import_meshes.build_skeleton_section(kuro_mdl_import_meshes.build_skeleton_struct_from_mdl(mdl_file[:-4]))
+                    mesh_data, primitive_data, material_list = kuro_mdl_import_meshes.build_mesh_section(mdl_file[:-4], kuro_ver = kuro_ver)
+                    material_data = kuro_mdl_import_meshes.build_material_section(self, context, "", 
+                        material_list, kuro_ver, LIST_OT_ExportItem.collectmaterial(self, context))
+                    new_mdl_data = kuro_mdl_import_meshes.insert_model_data(mdl_data, skeleton_data, material_data, mesh_data, primitive_data, kuro_ver)
+                    # Instead of overwriting backups, it will just tag a number onto the end
+                    backup_suffix = ''
+                    if nobak == False:
+                        if os.path.exists(mdl_file + '.bak' + backup_suffix):
+                            backup_suffix = '1'
+                            if os.path.exists(mdl_file + '.bak' + backup_suffix):
+                                while os.path.exists(mdl_file + '.bak' + backup_suffix):
+                                    backup_suffix = str(int(backup_suffix) + 1)
+                            shutil.copy2(mdl_file, mdl_file + '.bak' + backup_suffix)
+                        else:
+                            shutil.copy2(mdl_file, mdl_file + '.bak')
+                    if (compressed == True and change_compression == False) or (compressed == False and change_compression == True):
+                        new_mdl_data = kuro_mdl_import_meshes.compressCLE(new_mdl_data)
+                    with open(mdl_file,'wb') as f:
+                        f.write(new_mdl_data)
             return {'FINISHED'}
         except Exception as e:
-            self.report({'ERROR'}, f"导入文件夹时出现错误: {e}")
+            self.report({'ERROR'}, f"导入文件时出现错误: {e}")
             return {'CANCELLED'}
         return {'CANCELLED'}
 ########################## Divider ##########################
@@ -575,7 +954,7 @@ class O_DelOtherBone(bpy.types.Operator):
             return {'FINISHED'}
         self.report({'INFO'},f"O_DelOtherBone finished")
         return {'FINISHED'}
-    
+
 class O_DelBone(bpy.types.Operator):
     bl_idname = "fdktools.remove_head_bones"
     bl_label = "删除所有子骨骼"
@@ -600,7 +979,7 @@ class O_DelBone(bpy.types.Operator):
             return {'FINISHED'}
         self.report({'INFO'},f"O_DelBone finished")
         return {'FINISHED'}
-        
+
 class O_RenameBone(bpy.types.Operator):
     bl_idname = "fdktools.rename_head_bones"
     bl_label = "重命名脸部顶点组"
@@ -674,7 +1053,7 @@ class O_RenameBone(bpy.types.Operator):
         bpy.ops.object.mode_set(mode='OBJECT')
         self.report({'INFO'},f"O_RenameBone finished")
         return {'FINISHED'}
-        
+
 class O_AddEmpty(bpy.types.Operator):
     bl_idname = "fdktools.add_empty_objects"
     bl_label = "按JSON添加空物体"
@@ -735,7 +1114,7 @@ class O_AddEmpty(bpy.types.Operator):
                 self.report({'INFO'}, obj[0]+": "+obj[0]+" already exists;skipped")
         self.report({'INFO'},f"O_AddEmpty finished")
         return {'FINISHED'}
-    
+
 class O_CopyBone(bpy.types.Operator):
     bl_idname = "fdktools.copy_bone_nodes"
     bl_label = "根据JSON配置复制位置"
@@ -997,7 +1376,7 @@ class O_hideEmpty(bpy.types.Operator):
                 
         self.report({'INFO'},f"O_hideEmpty finished")
         return {'FINISHED'}
-        
+
 class O_showEmpty(bpy.types.Operator):
     bl_idname = "fdktools.unhide_empty_object"
     bl_label = "取消隐藏空物体"
@@ -1011,7 +1390,7 @@ class O_showEmpty(bpy.types.Operator):
                 
         self.report({'INFO'},f"O_showEmpty finished")
         return {'FINISHED'}
-        
+
 class O_delEmpty(bpy.types.Operator):
     bl_idname = "fdktools.remove_empty_object"
     bl_label = "⚠移除空物体"
@@ -1028,7 +1407,7 @@ class O_delEmpty(bpy.types.Operator):
         bpy.ops.object.delete()
         self.report({'INFO'},f"O_delEmpty finished")
         return {'FINISHED'}
-        
+
 class O_resetEmptyRot1(bpy.types.Operator):
     bl_idname = "fdktools.reset_empty_object1"
     bl_label = "空物体旋转0,0"
@@ -1048,7 +1427,7 @@ class O_resetEmptyRot1(bpy.types.Operator):
         else:
             self.report({'INFO'},f"请切换编辑模式并令物体可见")
         return {'FINISHED'}
-        
+
 class O_resetEmptyRot2(bpy.types.Operator):
     bl_idname = "fdktools.reset_empty_object2"
     bl_label = "空物体旋转90,-90"
@@ -1067,7 +1446,7 @@ class O_resetEmptyRot2(bpy.types.Operator):
         else:
             self.report({'INFO'},f"请切换编辑模式并令物体可见")
         return {'FINISHED'}
-        
+
 class O_copyEmptyRot(bpy.types.Operator):
     bl_idname = "fdktools.copy_empty_rotation"
     bl_label = "复制空物体旋转缩放"
@@ -1086,7 +1465,7 @@ class O_copyEmptyRot(bpy.types.Operator):
         target.scale = source.scale
         self.report({'INFO'},f"copy_empty_rotation finished")
         return {'FINISHED'}
-        
+
 class O_del_glTF_not(bpy.types.Operator):
     bl_idname = "fdktools.remove_gltf_collection"
     bl_label = "清理glTF_not_exported"
@@ -1546,7 +1925,6 @@ class O_select_Meshes_By_Armature(bpy.types.Operator):
             return {'FINISHED'}
         self.report({'INFO'},f"O_select_Meshes_By_Armature finished")
         return {'FINISHED'}
-        
 class O_unselect_Meshes_By_Armature(bpy.types.Operator):
     bl_idname = "fdktools.unselect_meshes_by_arm"
     bl_label = "取消选中"
@@ -1596,7 +1974,6 @@ class O_unselect_Meshes_By_Armature(bpy.types.Operator):
             return {'FINISHED'}
         self.report({'INFO'},f"O_unselect_Meshes_By_Armature finished")
         return {'FINISHED'}
-    
 ########################## Divider ##########################
 class O_join_Meshes(bpy.types.Operator):
     bl_idname = "fdktools.join_selected_meshes"
@@ -1836,12 +2213,6 @@ class FDK_PT_Snippets(bpy.types.Panel):
             O_CopyBonecol.enabled=False
             col = box.column(align=True)
             col.label(text="先导入JSON才能操作")
-        
-        col = box.column(align=True)
-        O_CopyBonerow = col.row(align=True)
-        O_CopyBonerow.operator(O_compare_Armatures.bl_idname, text=O_compare_Armatures.bl_label, icon="COPYDOWN")#对比骨架
-        O_CopyBonerow.operator(O_copy_Armatures.bl_idname, text=O_copy_Armatures.bl_label, icon="COPYDOWN")#复制结构
-        
         # row = O_CopyBonecol.row(align=True)
         # row.prop(context.scene, "change_matrix", text="copy_matrix")
         # row.prop(context.scene, "change_tail", text="copy_tail")
@@ -1857,6 +2228,10 @@ class FDK_PT_Snippets(bpy.types.Panel):
             # box = layout.box()
             # col = box.column()
             # col.label(text="先导入JSON才能复制位置")
+        col = box.column(align=True)
+        O_CopyBonerow = col.row(align=True)
+        O_CopyBonerow.operator(O_compare_Armatures.bl_idname, text=O_compare_Armatures.bl_label, icon="COPYDOWN")#对比骨架
+        O_CopyBonerow.operator(O_copy_Armatures.bl_idname, text=O_copy_Armatures.bl_label, icon="COPYDOWN")#复制结构
 
 class FDK_PT_Snippets_Target(bpy.types.Panel):
     bl_idname = "FDK_PT_Snippets_Target"
@@ -1956,7 +2331,7 @@ class FDK_PT_Snippets_FGOA(bpy.types.Panel):
         col.enabled = (not sel_obj is None) and (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")
         
         child_row = col.row(align=True)
-        if not (bpy.context.object.mode == 'EDIT' and bpy.context.selected_editable_bones != None and len(bpy.context.selected_editable_bones) ==2):
+        if (bpy.context.object is None) or (not (bpy.context.object.mode == 'EDIT' and bpy.context.selected_editable_bones != None and len(bpy.context.selected_editable_bones) ==2)):
             child_row.enabled = False
         child_row.operator(O_copy_Bone_Pos.bl_idname, text=O_copy_Bone_Pos.bl_label, icon="COPYDOWN")
         child_row.operator(O_copy_Bone_Pos2.bl_idname, text=O_copy_Bone_Pos2.bl_label, icon="COPYDOWN")
@@ -1979,7 +2354,7 @@ class FDK_PT_Snippets_FGOA(bpy.types.Panel):
         row = col.row(align=True)
         row.operator(O_renameMaterial.bl_idname, text=O_renameMaterial.bl_label)
         row.operator(O_renameMaterialdds.bl_idname, text=O_renameMaterialdds.bl_label)
-        
+
 class FDK_PT_Snippets_Others(bpy.types.Panel):
     bl_idname = "FDK_PT_Snippets_Others"
     bl_label = "其他快捷操作"
@@ -2062,6 +2437,7 @@ class FDK_PT_Snippets_IO(bpy.types.Panel):
         layout = self.layout
         box = layout.box()
         col = box.column(align=True)
+        col.prop(context.scene, "compare_local", text="本地数据💡")
         row = col.row(align=True)
         row.operator(O_ImportMDL.bl_idname, icon="IMPORT")#Import MDL
         row.prop(context.scene, "usedds", text="使用dds贴图")
@@ -2078,69 +2454,93 @@ class FDK_PT_Snippets_IO(bpy.types.Panel):
         
         box = layout.box()
         col = box.column(align=True)
-        col.operator(O_CheckMaterials.bl_idname, icon="MATERIAL")#Compare Material JSON
-        
+        row = col.row(align=True)
+        if bpy.context.scene.compare_local == True:
+            row.operator(O_CheckMaterialsLocal.bl_idname, icon="MATERIAL")#Compare Material JSON
+        else:
+            row.operator(O_CheckMaterials.bl_idname, icon="MATERIAL")#Compare Material JSON
         box = layout.box()
         col = box.column(align=True)
-        col.operator(O_ExportMDL.bl_idname, icon="FILE_REFRESH")#MDL to VBIB
-        col.operator(O_ConvertMDL.bl_idname, icon="FILE_REFRESH")#MDL to GLB+BIN
-        col.operator(O_GltfToMeshes.bl_idname, icon="FILE_REFRESH")#GLTF to Meshes
-        
         # col.prop(context.scene, "fdk_source_mesh", text="源网格", icon="MESH_DATA")
         # col.prop(context.scene, "fdk_target_mesh", text="目标网格", icon="MESH_DATA")
         # col.operator(O_join_Meshes.bl_idname, text=O_join_Meshes.bl_label, icon="MESH_DATA")
+        col.operator(O_ExportMDL.bl_idname, icon="FILE_REFRESH")#MDL to VBIB
+        col.operator(O_ConvertMDL.bl_idname, icon="FILE_REFRESH")#MDL to GLB+BIN
+        col.operator(O_GltfToMeshes.bl_idname, icon="FILE_REFRESH")#GLTF to Meshes
 ########################## Divider ##########################
+classes = [
+    TextureItem,
+    MaterialListItem,
+    MetadataListItem,
+    P_UL_Material_List,
+    P_UL_Metadata_List,
+    LIST_OT_LoadItem,
+    LIST_OT_CopyItem,
+    LIST_OT_ExportItem,
+    LIST_OT_SelectAll,
+    LIST_OT_UnselectAll,
+    #LIST_OT_DeleteItem,
+    #LIST_OT_MoveItem,
+    O_ExportVBIB,
+    O_ConvertMDL,
+    O_ExportMDL,
+    O_ExportMDLJson,
+    O_ExportMDLMetadata,
+    O_GltfToMeshes,
+    O_ImportMDL,
+    O_UpdateMDL,
+    O_CheckMaterials,
+    O_CheckMaterialsLocal,
+    #O_AssignArmature,
+    O_ImportJSON,
+    O_ImportRenameJSON,
+    O_ImportMovingJSON,
+    O_DelBone,
+    O_DelOtherBone,
+    O_select_Meshes_By_Armature,
+    O_unselect_Meshes_By_Armature,
+    O_RenameBone,
+    O_CopyBone,
+    O_compare_Armatures,
+    O_copy_Armatures,
+    O_attach_Armatures,
+    O_attach_Armatures2,
+    O_AddEmpty,
+    O_RenameByJSON,
+    O_MoveByJSON,
+    O_hideEmpty,
+    O_showEmpty,
+    O_delEmpty,
+    O_resetEmptyRot1,
+    O_resetEmptyRot2,
+    O_copyEmptyRot,
+    O_del_glTF_not,
+    O_join_Meshes,
+    O_get_MaterialName,
+    O_get_Names_By_Armature,
+    O_copy_Bone_Pos,
+    O_copy_Bone_Pos2,
+    O_copy_Bone_Pos3,
+    O_remove_Empty_Bone,
+    O_renameMaterial,
+    O_renameMaterialdds,
+    FDK_PT_Snippets,
+    FDK_PT_Snippets_Target,
+    FDK_PT_Snippets_FGOA,
+    FDK_PT_Snippets_Others,
+    FDK_PT_Snippets_IO,
+    HelloWorldPanel
+    ]
+
 def register():
-    # bpy.utils.register_class(O_AssignArmature)
-    bpy.utils.register_class(O_ExportVBIB)
-    bpy.utils.register_class(O_ConvertMDL)
-    bpy.utils.register_class(O_ExportMDL)
-    bpy.utils.register_class(O_ExportMDLJson)
-    bpy.utils.register_class(O_ExportMDLMetadata)
-    bpy.utils.register_class(O_GltfToMeshes)
-    bpy.utils.register_class(O_ImportMDL)
-    bpy.utils.register_class(O_UpdateMDL)
-    bpy.utils.register_class(O_CheckMaterials)
+    for cls in classes:
+        bpy.utils.register_class(cls)
+        
+    bpy.types.Scene.my_list = bpy.props.CollectionProperty(type = MaterialListItem)
+    bpy.types.Scene.list_index = bpy.props.IntProperty(name = "Index for my_list", default = 0)
     
-    bpy.utils.register_class(O_ImportJSON)
-    bpy.utils.register_class(O_ImportRenameJSON)
-    bpy.utils.register_class(O_ImportMovingJSON)
-    bpy.utils.register_class(O_DelBone)
-    bpy.utils.register_class(O_DelOtherBone)
-    bpy.utils.register_class(O_select_Meshes_By_Armature)
-    bpy.utils.register_class(O_unselect_Meshes_By_Armature)
-    bpy.utils.register_class(O_RenameBone)
-    bpy.utils.register_class(O_CopyBone)
-    bpy.utils.register_class(O_compare_Armatures)
-    bpy.utils.register_class(O_copy_Armatures)
-    bpy.utils.register_class(O_attach_Armatures)
-    bpy.utils.register_class(O_attach_Armatures2)
-    bpy.utils.register_class(O_AddEmpty)
-    bpy.utils.register_class(O_RenameByJSON)
-    bpy.utils.register_class(O_MoveByJSON)
-    
-    bpy.utils.register_class(O_hideEmpty)
-    bpy.utils.register_class(O_showEmpty)
-    bpy.utils.register_class(O_delEmpty)
-    bpy.utils.register_class(O_resetEmptyRot1)
-    bpy.utils.register_class(O_resetEmptyRot2)
-    bpy.utils.register_class(O_copyEmptyRot)
-    bpy.utils.register_class(O_del_glTF_not)
-    bpy.utils.register_class(O_join_Meshes)
-    bpy.utils.register_class(O_get_MaterialName)
-    bpy.utils.register_class(O_get_Names_By_Armature)
-    bpy.utils.register_class(O_copy_Bone_Pos)
-    bpy.utils.register_class(O_copy_Bone_Pos2)
-    bpy.utils.register_class(O_copy_Bone_Pos3)
-    bpy.utils.register_class(O_remove_Empty_Bone)
-    bpy.utils.register_class(O_renameMaterial)
-    bpy.utils.register_class(O_renameMaterialdds)
-    
-    bpy.utils.register_class(FDK_PT_Snippets)
-    bpy.utils.register_class(FDK_PT_Snippets_Target)
-    bpy.utils.register_class(FDK_PT_Snippets_FGOA)
-    bpy.utils.register_class(FDK_PT_Snippets_Others)
-    bpy.utils.register_class(FDK_PT_Snippets_IO)
+    bpy.types.Scene.metadata_list = bpy.props.CollectionProperty(type = MetadataListItem)
+    bpy.types.Scene.metadata_index = bpy.props.IntProperty(name = "Index for metadata_list", default = 0)
     
     bpy.types.Scene.fdk_config_json_data = bpy.props.StringProperty(
         name="Config JSON Data",description="配置数据",default=""
@@ -2187,61 +2587,21 @@ def register():
     bpy.types.Scene.do_not_backup = bpy.props.BoolProperty(
         name="donot backup",description="导入时不创建bak",default= True
     )
+    bpy.types.Scene.compare_local = bpy.props.BoolProperty(
+        name="compare local",description="使用从mdl导入内部的数据。只对带💡的项目有效。",default= True
+    )
     bpy.types.Scene.usedds = bpy.props.BoolProperty(
         name="use dds",description="改用dds",default= True
     )
 
 def unregister():
-    # bpy.utils.unregister_class(O_AssignArmature)
-    bpy.utils.unregister_class(O_ExportVBIB)
-    bpy.utils.unregister_class(O_ConvertMDL)
-    bpy.utils.unregister_class(O_ExportMDL)
-    bpy.utils.unregister_class(O_ExportMDLJson)
-    bpy.utils.unregister_class(O_ExportMDLMetadata)
-    bpy.utils.unregister_class(O_GltfToMeshes)
-    bpy.utils.unregister_class(O_ImportMDL)
-    bpy.utils.unregister_class(O_UpdateMDL)
-    bpy.utils.unregister_class(O_CheckMaterials)
+    del bpy.types.Scene.my_list
+    del bpy.types.Scene.list_index
+    del bpy.types.Scene.metadata_list
+    del bpy.types.Scene.metadata_index
     
-    bpy.utils.unregister_class(O_ImportJSON)
-    bpy.utils.unregister_class(O_ImportRenameJSON)
-    bpy.utils.unregister_class(O_ImportMovingJSON)
-    bpy.utils.unregister_class(O_DelBone)
-    bpy.utils.unregister_class(O_DelOtherBone)
-    bpy.utils.unregister_class(O_select_Meshes_By_Armature)
-    bpy.utils.unregister_class(O_unselect_Meshes_By_Armature)
-    bpy.utils.unregister_class(O_RenameBone)
-    bpy.utils.unregister_class(O_CopyBone)
-    bpy.utils.unregister_class(O_compare_Armatures)
-    bpy.utils.unregister_class(O_copy_Armatures)
-    bpy.utils.unregister_class(O_attach_Armatures)
-    bpy.utils.unregister_class(O_attach_Armatures2)
-    bpy.utils.unregister_class(O_AddEmpty)
-    bpy.utils.unregister_class(O_RenameByJSON)
-    bpy.utils.unregister_class(O_MoveByJSON)
-    
-    bpy.utils.unregister_class(O_hideEmpty)
-    bpy.utils.unregister_class(O_showEmpty)
-    bpy.utils.unregister_class(O_delEmpty)
-    bpy.utils.unregister_class(O_resetEmptyRot1)
-    bpy.utils.unregister_class(O_resetEmptyRot2)
-    bpy.utils.unregister_class(O_copyEmptyRot)
-    bpy.utils.unregister_class(O_del_glTF_not)
-    bpy.utils.unregister_class(O_join_Meshes)
-    bpy.utils.unregister_class(O_get_MaterialName)
-    bpy.utils.unregister_class(O_get_Names_By_Armature)
-    bpy.utils.unregister_class(O_copy_Bone_Pos)
-    bpy.utils.unregister_class(O_copy_Bone_Pos2)
-    bpy.utils.unregister_class(O_copy_Bone_Pos3)
-    bpy.utils.unregister_class(O_remove_Empty_Bone)
-    
-    bpy.utils.unregister_class(FDK_PT_Snippets)
-    bpy.utils.unregister_class(FDK_PT_Snippets_Target)
-    bpy.utils.unregister_class(FDK_PT_Snippets_FGOA)
-    bpy.utils.unregister_class(FDK_PT_Snippets_Others)
-    bpy.utils.unregister_class(FDK_PT_Snippets_IO)
-    bpy.utils.unregister_class(O_renameMaterial)
-    bpy.utils.unregister_class(O_renameMaterialdds)
+    for cls in classes:
+        bpy.utils.unregister_class(cls)
 
     del bpy.types.Scene.fdk_config_json_data
     del bpy.types.Scene.fdk_rename_pair_json_data
@@ -2259,4 +2619,5 @@ def unregister():
     del bpy.types.Scene.change_tail
     del bpy.types.Scene.reset_empty
     del bpy.types.Scene.do_not_backup
+    del bpy.types.Scene.compare_local
     del bpy.types.Scene.usedds

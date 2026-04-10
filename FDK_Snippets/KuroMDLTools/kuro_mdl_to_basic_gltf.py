@@ -617,7 +617,7 @@ def write_glTF(filename, skel_struct, mesh_struct = False, material_struct = Fal
     if write_to_file == True:
 	    with open(filename[:-4]+'.metadata', 'wb') as f:
 	        f.write(json.dumps(gltf_metadata, indent=4).encode("utf-8"))
-    return gltf_data, giant_buffer
+    return gltf_data, giant_buffer, gltf_metadata
 
 def process_mdl (mdl_file, mdl_data, overwrite = False, write_glb = True, dump_extra_animation_data = False, calc_ibm = True, write_to_file = True, usedds = False, metadataonly = False):
     print("Processing {0}...".format(mdl_file))
@@ -638,8 +638,8 @@ def process_mdl (mdl_file, mdl_data, overwrite = False, write_glb = True, dump_e
                 write_struct_to_json(skel_struct,mdl_file[:-4]+"_skeleton")
             #skel_struct = apply_first_frame_as_pose(skel_struct, ani_struct)
             ani_struct = calc_abs_ani_rotations(skel_struct, ani_struct)
-        gltf_data, giant_buffer = write_glTF(mdl_file, skel_struct, mesh_struct, material_struct, ani_struct, write_glb = write_glb, calc_ibm = calc_ibm, write_to_file=write_to_file, usedds = usedds, metadataonly = metadataonly)
-        return gltf_data, giant_buffer
+        gltf_data, giant_buffer, gltf_metadata = write_glTF(mdl_file, skel_struct, mesh_struct, material_struct, ani_struct, write_glb = write_glb, calc_ibm = calc_ibm, write_to_file=write_to_file, usedds = usedds, metadataonly = metadataonly)
+        return gltf_data, giant_buffer, gltf_metadata
 
 if __name__ == "__main__":
     # Set current directory
