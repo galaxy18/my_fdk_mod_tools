@@ -24,6 +24,7 @@ bl_info = {
 #1.1.3:直接调用移除glTF_not_exported
 #1.1.4:增加直接输出为vb+ib文件夹；提取json调整为只输出2个不会被覆盖的json；增加提取metadata
 #1.1.5:将输出为vb+ib文件夹的设置从自定义文件名改为选择输出文件夹；增加简易对比材质json
+#1.1.6:增加导入json数据。由于展示数据会使选项面板显得太长，将面板划分为三个。
 ########################## Divider ##########################
 from . import panel, sub_kuro_mdl_tools, sub_others
 

@@ -7,7 +7,7 @@ from .io_scene_gltf2.io.imp.gltf2_io_gltf import glTFImporter
 from .io_scene_gltf2.io.com.gltf2_io import Gltf, gltf_from_dict
 from .io_scene_gltf2.blender.exp.export import __export as gltf2_blender_export
 ########################## Divider ##########################
-#TODO:导入删除配置
+#TODO:做删除配置功能
 ########################## Divider ##########################
 #https://sinestesia.co/blog/tutorials/using-uilists-in-blender/
 class TextureItem(bpy.types.PropertyGroup):
@@ -215,7 +215,7 @@ class LIST_OT_LoadItem(bpy.types.Operator):
 
 class FDK_PT_FDKMATERIAL(bpy.types.Panel):
     bl_idname = "KURO_PT_KuroMDL_material"
-    bl_label = "KuroMDL Metadata"
+    bl_label = "KuroMDL Material"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "FDK_Snippets"
@@ -279,7 +279,7 @@ class FDK_PT_FDKMATERIAL(bpy.types.Panel):
 
 class FDK_PT_FDKMETADATA(bpy.types.Panel):
     bl_idname = "KURO_PT_KuroMDL_metadata"
-    bl_label = "KuroMDL Material"
+    bl_label = "KuroMDL Metadata"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "FDK_Snippets"
@@ -625,6 +625,61 @@ class O_ExportMDL(bpy.types.Operator, ImportHelper):
         kuro_mdl_export_meshes.process_mdl(mdl_file, mdl_data, True, False, False, True)
         return {'FINISHED'}
 ########################## Divider ##########################
+class O_ImportMaterial(bpy.types.Operator, ImportHelper):
+    bl_idname = "fdktools.import_material"
+    bl_label = "导入Material"
+    bl_description = "选择json或mdl，导入材质定义"
+    filename_ext = ".mdl"
+    filter_glob: bpy.props.StringProperty(
+        default="*.mdl;*.json",
+        options={'HIDDEN'},
+    )
+    
+    def execute(self, context):
+        import sys
+        mdl_file = self.filepath
+        if not mdl_file or not os.path.exists(mdl_file):
+            self.report({'ERROR'}, "请选择文件")
+            return {'CANCELLED'}
+        filename, file_extension = os.path.splitext(mdl_file)
+        if file_extension == '.json':
+            self.report({'INFO'}, f"Processing {mdl_file}")
+            try:
+                json_file = os.path.dirname(mdl_file) + "/material_info.json"
+                material_struct = lib_fmtibvb.read_struct_from_json(json_file)
+                if bpy.context.scene.get("kuromdlmetadata") is None:
+                    bpy.context.scene["kuromdlmetadata"] = "[]"
+                
+                localstorage = json.loads(bpy.context.scene["kuromdlmetadata"]);
+                localstorage.append({
+                    f"imported_material_struct":{"data":material_struct,"type":'material_struct','path':json_file}
+                })
+                
+                bpy.context.scene["kuromdlmetadata"] = json.dumps(localstorage)
+                LIST_OT_LoadItem.execute(self, context)
+            except Exception as e:
+                print("{0} missing or unreadable".format(json_file))
+                self.report({'INFO'}, f"{e}")
+        else:
+            self.report({'INFO'}, f"Processing {mdl_file}")
+            with open(mdl_file, "rb") as f:
+                mdl_data = f.read()
+            material_struct = kuro_mdl_export_meshes.obtain_material_data(mdl_data)
+            gltf_data, giant_buffer, gltf_metadata = kuro_mdl_to_basic_gltf.process_mdl(mdl_file, mdl_data, True, False, False, True, False, context.scene.fdk_opt_usedds)
+        
+            if bpy.context.scene.get("kuromdlmetadata") is None:
+                bpy.context.scene["kuromdlmetadata"] = "[]"
+            
+            localstorage = json.loads(bpy.context.scene["kuromdlmetadata"]);
+            localstorage.append({
+                f"{bpy.path.display_name_from_filepath(mdl_file)}_material_struct":{"data":material_struct,"type":'material_struct'},
+                f"{bpy.path.display_name_from_filepath(mdl_file)}_gltf_metadata":{"data":gltf_metadata,"type":'gltf_metadata'}
+            })
+            
+            bpy.context.scene["kuromdlmetadata"] = json.dumps(localstorage)
+            LIST_OT_LoadItem.execute(self, context)
+        return {'FINISHED'}
+########################## Divider ##########################
 class O_ImportMDL(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.mdl_import"
     bl_label = "导入MDL"
@@ -637,7 +692,6 @@ class O_ImportMDL(bpy.types.Operator, ImportHelper):
     
     def execute(self, context):
         import sys
-        usedds = context.scene.fdk_opt_usedds
         mdl_file = self.filepath
         if not mdl_file or not os.path.exists(mdl_file):
             self.report({'ERROR'}, "请选择mdl文件")
@@ -648,7 +702,7 @@ class O_ImportMDL(bpy.types.Operator, ImportHelper):
             mdl_data = f.read()
         
         material_struct = kuro_mdl_export_meshes.obtain_material_data(mdl_data)
-        gltf_data, giant_buffer, gltf_metadata = kuro_mdl_to_basic_gltf.process_mdl(mdl_file, mdl_data, True, False, False, True, False, usedds)
+        gltf_data, giant_buffer, gltf_metadata = kuro_mdl_to_basic_gltf.process_mdl(mdl_file, mdl_data, True, False, False, True, False, context.scene.fdk_opt_usedds)
         
         if bpy.context.scene.get("kuromdlmetadata") is None:
             bpy.context.scene["kuromdlmetadata"] = "[]"
@@ -737,8 +791,8 @@ class O_GltfToMeshes(bpy.types.Operator, ImportHelper):
 ########################## Divider ##########################
 class O_UpdateMDL(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.mdl_import_vbib"
-    bl_label = "文件夹导入MDL💡"
-    bl_description = "选取MDL文件，以包含更改后的VBIB及JSON的同名文件夹中的数据更新MDL"
+    bl_label = "更新MDL💡"
+    bl_description = "选取MDL文件，以同名文件夹中的数据更新MDL。文件夹不存在时将先用工作区模型创建文件夹"
     filename_ext = ".mdl"
     filter_glob: bpy.props.StringProperty(
         default="*.mdl;*.mdl.bak*",
@@ -827,6 +881,7 @@ class FDK_PT_Snippets_IO(bpy.types.Panel):
         row = col.row(align=True)
         row.operator(O_ImportMDL.bl_idname, icon="IMPORT")#Import MDL
         row.prop(context.scene, "fdk_opt_usedds", text="使用dds贴图")
+        col.operator(O_ImportMaterial.bl_idname, icon="IMPORT")#ImportMaterial
         col.operator(O_ExportVBIB.bl_idname, icon="EXPORT")#Export VBIB
         
         box = layout.box()
@@ -878,6 +933,7 @@ classes = [
     O_UpdateMDL,
     O_CheckMaterials,
     O_CheckMaterialsLocal,
+    O_ImportMaterial,
     FDK_PT_Snippets_IO,
     FDK_PT_FDKMATERIAL,
     FDK_PT_FDKMETADATA
@@ -894,7 +950,7 @@ def register():
     bpy.types.Scene.metadata_index = bpy.props.IntProperty(name = "Index for metadata_list", default = 0)
     
     bpy.types.Scene.fdk_opt_do_not_backup = bpy.props.BoolProperty(
-        name="donot backup",description="导入时不创建bak",default= True
+        name="donot backup",description="导入时不创建bak",default= False
     )
     bpy.types.Scene.fdk_opt_override_vbib = bpy.props.BoolProperty(
         name="donot backup",description="覆盖",default= False

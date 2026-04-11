@@ -15,12 +15,12 @@ class MAIN_PT_FDKSnippets(bpy.types.Panel):
         # 使用 prop_enum 自动处理高亮状态
         row.prop_enum(context.scene, 'active_xbone_subpanel', 'Common', 
                      text="一般", icon='TOOL_SETTINGS')
-        row.prop_enum(context.scene, 'active_xbone_subpanel', 'Others',
-                     text="其他", icon='TOOL_SETTINGS')
         row.prop_enum(context.scene, 'active_xbone_subpanel', 'IOTools',
                      text="导入导出", icon='TOOL_SETTINGS')
+        row.prop_enum(context.scene, 'active_xbone_subpanel', 'Others',
+                     text="其他", icon='TOOL_SETTINGS')
                      
-class XBONE_OT_switch_subpanel(bpy.types.Operator):
+class FDK_OT_switch_subpanel(bpy.types.Operator):
     """切换子面板"""
     bl_idname = "xbone.switch_subpanel"
     bl_label = "切换子面板"
@@ -1337,7 +1337,7 @@ class FDK_PT_Snippets_Others(bpy.types.Panel):
 ########################## Divider ##########################
 classes = [
     MAIN_PT_FDKSnippets,
-    XBONE_OT_switch_subpanel,
+    FDK_OT_switch_subpanel,
     #O_AssignArmature,
     O_ImportJSON,
     O_ImportRenameJSON,
