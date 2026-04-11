@@ -25,15 +25,19 @@ bl_info = {
 #1.1.4:增加直接输出为vb+ib文件夹；提取json调整为只输出2个不会被覆盖的json；增加提取metadata
 #1.1.5:将输出为vb+ib文件夹的设置从自定义文件名改为选择输出文件夹；增加简易对比材质json
 ########################## Divider ##########################
-from . import panel
+from . import panel, sub_kuro_mdl_tools, sub_others
 
 # 注册插件
 def register():
     panel.register()
+    sub_kuro_mdl_tools.register()
+    sub_others.register()
 
 # 注销插件
 def unregister():
     panel.unregister()
+    sub_kuro_mdl_tools.unregister()
+    sub_others.unregister()
 
 if __name__ == "__main__":
     register()
