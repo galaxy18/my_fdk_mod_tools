@@ -8,6 +8,7 @@ from .io_scene_gltf2.io.com.gltf2_io import Gltf, gltf_from_dict
 from .io_scene_gltf2.blender.exp.export import __export as gltf2_blender_export
 ########################## Divider ##########################
 #TODO:做删除配置功能
+#TODO:修复识别.mdl.bak的问题
 ########################## Divider ##########################
 #https://sinestesia.co/blog/tutorials/using-uilists-in-blender/
 class TextureItem(bpy.types.PropertyGroup):
@@ -239,8 +240,9 @@ class FDK_PT_FDKMATERIAL(bpy.types.Panel):
             box = layout.box()
             row = box.row()
             row.operator('my_list.load_item', text='重新加载')
+            row.operator(O_ImportMaterial.bl_idname, icon="IMPORT")#ImportMaterial
             row.operator('my_list.export_item', text='输出')
-            row.label(text='')
+            #row.label(text='')#占位
             
             box = layout.box()
             row = box.row()
@@ -532,6 +534,8 @@ class O_ExportVBIB(bpy.types.Operator, ImportHelper):
                 metadata = lib_fmtibvb.read_struct_from_json(os.path.dirname(directory)+".metadata")
             except Exception as e:
                 self.report({'ERROR'}, f"文件不存在: {e}。将忽略metadata。")
+        print("metadata:")
+        print(json.dumps(metadata))
         #kuro_gltf_to_meshes.process_data(os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath), model_gltf, metadata, True, True)
         kuro_gltf_to_meshes.process_data(directory, model_gltf, metadata, True, True)
         #self.report({'INFO'}, f"export to {os.path.dirname(self.filepath) + '/' + bpy.path.display_name_from_filepath(self.filepath)}")
@@ -818,42 +822,41 @@ class O_UpdateMDL(bpy.types.Operator, ImportHelper):
                 if hasmissing==True:
                     ShowMessageBox(f"操作已中断，请检查输出窗口，添加缺少的材质")
                     return {'CANCELLED'}
+                if mdl_data[0:4] in [b"F9BA", b"C9BA", b"D9BA"]:
+                    compressed = True
+                    mdl_data = decryptCLE(mdl_data)
                 else:
-                    if mdl_data[0:4] in [b"F9BA", b"C9BA", b"D9BA"]:
-                        compressed = True
-                        mdl_data = decryptCLE(mdl_data)
-                    else:
-                        compressed = False
-                    if kuro_mdl_export_meshes.obtain_material_data(mdl_data) == False:
-                        print("Skipping {0} as it is not a model file.".format(mdl_file))
-                        return False
+                    compressed = False
+                if kuro_mdl_export_meshes.obtain_material_data(mdl_data) == False:
+                    print("Skipping {0} as it is not a model file.".format(mdl_file))
+                    return {'CANCELLED'}
+                
+                if not os.path.exists(mdl_file[:-4]):
+                    os.mkdir(mdl_file[:-4])
+                    O_ExportVBIB.export(self, context, mdl_file[:-4])
+                elif context.scene.fdk_opt_override_vbib == True:
+                    O_ExportVBIB.export(self, context, mdl_file[:-4])
                     
-                    if not os.path.exists(mdl_file[:-4]):
-                        os.mkdir(mdl_file[:-4])
-                        O_ExportVBIB.export(self, context, mdl_file[:-4])
-                    elif context.scene.fdk_opt_override_vbib == True:
-                        O_ExportVBIB.export(self, context, mdl_file[:-4])
-                        
-                    skeleton_data = kuro_mdl_import_meshes.build_skeleton_section(kuro_mdl_import_meshes.build_skeleton_struct_from_mdl(mdl_file[:-4]))
-                    mesh_data, primitive_data, material_list = kuro_mdl_import_meshes.build_mesh_section(mdl_file[:-4], kuro_ver = kuro_ver)
-                    material_data = kuro_mdl_import_meshes.build_material_section(self, context, "", 
-                        material_list, kuro_ver, LIST_OT_ExportItem.collectmaterial(self, context))
-                    new_mdl_data = kuro_mdl_import_meshes.insert_model_data(mdl_data, skeleton_data, material_data, mesh_data, primitive_data, kuro_ver)
-                    # Instead of overwriting backups, it will just tag a number onto the end
-                    backup_suffix = ''
-                    if context.scene.fdk_opt_do_not_backup == False:
+                skeleton_data = kuro_mdl_import_meshes.build_skeleton_section(kuro_mdl_import_meshes.build_skeleton_struct_from_mdl(mdl_file[:-4]))
+                mesh_data, primitive_data, material_list = kuro_mdl_import_meshes.build_mesh_section(mdl_file[:-4], kuro_ver = kuro_ver)
+                material_data = kuro_mdl_import_meshes.build_material_section(self, context, "", 
+                    material_list, kuro_ver, LIST_OT_ExportItem.collectmaterial(self, context))
+                new_mdl_data = kuro_mdl_import_meshes.insert_model_data(mdl_data, skeleton_data, material_data, mesh_data, primitive_data, kuro_ver)
+                # Instead of overwriting backups, it will just tag a number onto the end
+                backup_suffix = ''
+                if context.scene.fdk_opt_do_not_backup == False:
+                    if os.path.exists(mdl_file + '.bak' + backup_suffix):
+                        backup_suffix = '1'
                         if os.path.exists(mdl_file + '.bak' + backup_suffix):
-                            backup_suffix = '1'
-                            if os.path.exists(mdl_file + '.bak' + backup_suffix):
-                                while os.path.exists(mdl_file + '.bak' + backup_suffix):
-                                    backup_suffix = str(int(backup_suffix) + 1)
-                            shutil.copy2(mdl_file, mdl_file + '.bak' + backup_suffix)
-                        else:
-                            shutil.copy2(mdl_file, mdl_file + '.bak')
-                    if (compressed == True and change_compression == False) or (compressed == False and change_compression == True):
-                        new_mdl_data = kuro_mdl_import_meshes.compressCLE(new_mdl_data)
-                    with open(mdl_file,'wb') as f:
-                        f.write(new_mdl_data)
+                            while os.path.exists(mdl_file + '.bak' + backup_suffix):
+                                backup_suffix = str(int(backup_suffix) + 1)
+                        shutil.copy2(mdl_file, mdl_file + '.bak' + backup_suffix)
+                    else:
+                        shutil.copy2(mdl_file, mdl_file + '.bak')
+                if (compressed == True and change_compression == False) or (compressed == False and change_compression == True):
+                    new_mdl_data = kuro_mdl_import_meshes.compressCLE(new_mdl_data)
+                with open(mdl_file,'wb') as f:
+                    f.write(new_mdl_data)
             return {'FINISHED'}
         except Exception as e:
             self.report({'ERROR'}, f"导入文件时出现错误: {e}")
@@ -881,7 +884,6 @@ class FDK_PT_Snippets_IO(bpy.types.Panel):
         row = col.row(align=True)
         row.operator(O_ImportMDL.bl_idname, icon="IMPORT")#Import MDL
         row.prop(context.scene, "fdk_opt_usedds", text="使用dds贴图")
-        col.operator(O_ImportMaterial.bl_idname, icon="IMPORT")#ImportMaterial
         col.operator(O_ExportVBIB.bl_idname, icon="EXPORT")#Export VBIB
         
         box = layout.box()
