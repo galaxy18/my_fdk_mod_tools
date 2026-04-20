@@ -1,7 +1,7 @@
 bl_info = {
     "name": "FDK Snippets",
     "author": "",
-    "version": (1, 1, 6),
+    "version": (1, 1, 9),
     "blender": (4, 2, 3),
     "location": "View3D > Tool Shelf >FDK_Snippets Panel",
     "description": "FDK MOD制作 快捷代码",
@@ -25,6 +25,9 @@ bl_info = {
 #1.1.4:增加直接输出为vb+ib文件夹；提取json调整为只输出2个不会被覆盖的json；增加提取metadata
 #1.1.5:将输出为vb+ib文件夹的设置从自定义文件名改为选择输出文件夹；增加简易对比材质json
 #1.1.6:增加导入json数据。由于展示数据会使选项面板显得太长，将面板划分为三个。
+#1.1.7:增加导入新json前保存当前配置。增加删除配置按钮。
+#1.1.8:尝试不依靠输出文件更新mdl
+#1.1.9:支持选取.mdl.bak文件；修复了作者忘了给变量改个独特点的名字的问题
 ########################## Divider ##########################
 from . import panel, sub_kuro_mdl_tools, sub_others
 

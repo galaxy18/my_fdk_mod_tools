@@ -351,8 +351,8 @@ def process_gltf (gltf_filename, complete_maps = complete_vgmaps_default, overwr
     process_data(model_name, model_gltf, metadata, complete_maps = complete_maps, overwrite = overwrite)
 
 def process_data (model_name, model_gltf, metadata, complete_maps = True, overwrite = True):
-    if (overwrite == True) or not os.path.exists(model_name):
-        if not os.path.exists(model_name):
+    if (overwrite == True) or not os.path.exists(model_name) or model_name=="":
+        if model_name!="" and not os.path.exists(model_name):
             os.mkdir(model_name)
         skel_struct = build_skeleton_struct (model_gltf, metadata)
         mesh_nodes = [x for x in model_gltf.nodes if x.mesh is not None]
@@ -362,12 +362,13 @@ def process_data (model_name, model_gltf, metadata, complete_maps = True, overwr
             submeshes = dump_meshes(mesh_node, model_gltf, complete_maps = complete_maps)
             mesh_node_metadata = { 'name': mesh_node.name, 'primitives': [] }
             for i in range(len(submeshes)):
-                write_fmt(submeshes[i]['fmt'], '{0}/{1}_{2}.fmt'.format(model_name, mesh_node.mesh, submeshes[i]['name']))
-                write_ib(submeshes[i]['ib'], '{0}/{1}_{2}.ib'.format(model_name, mesh_node.mesh, submeshes[i]['name']), submeshes[i]['fmt'])
-                write_vb(submeshes[i]['vb'], '{0}/{1}_{2}.vb'.format(model_name, mesh_node.mesh, submeshes[i]['name']), submeshes[i]['fmt'])
-                if 'vgmap' in submeshes[i]:
-                    with open('{0}/{1}_{2}.vgmap'.format(model_name, mesh_node.mesh, submeshes[i]['name']), 'wb') as f:
-                        f.write(json.dumps(submeshes[i]['vgmap'], indent=4).encode("utf-8"))
+                if model_name!="":
+                    write_fmt(submeshes[i]['fmt'], '{0}/{1}_{2}.fmt'.format(model_name, mesh_node.mesh, submeshes[i]['name']))
+                    write_ib(submeshes[i]['ib'], '{0}/{1}_{2}.ib'.format(model_name, mesh_node.mesh, submeshes[i]['name']), submeshes[i]['fmt'])
+                    write_vb(submeshes[i]['vb'], '{0}/{1}_{2}.vb'.format(model_name, mesh_node.mesh, submeshes[i]['name']), submeshes[i]['fmt'])
+                    if 'vgmap' in submeshes[i]:
+                        with open('{0}/{1}_{2}.vgmap'.format(model_name, mesh_node.mesh, submeshes[i]['name']), 'wb') as f:
+                            f.write(json.dumps(submeshes[i]['vgmap'], indent=4).encode("utf-8"))
                 if (model_gltf.meshes[mesh_node.mesh].primitives[i].material is not None
                 and not model_gltf.materials[model_gltf.meshes[mesh_node.mesh].primitives[i].material].name == 'collision'):
                     mesh_node_metadata['primitives'].append({'id_referenceonly': i,\
@@ -389,12 +390,16 @@ def process_data (model_name, model_gltf, metadata, complete_maps = True, overwr
             mesh_node_metadata['section2'] = {"unk0": unk0, "unk1": unk1,
                 "flags": flags}
             mesh_metadata.append(mesh_node_metadata)
-        with open('{0}/skeleton.json'.format(model_name), "wb") as f:
-            f.write(json.dumps(skel_struct, indent=4).encode("utf-8"))    
-        with open('{0}/mesh_info.json'.format(model_name), "wb") as f:
-            f.write(json.dumps(mesh_metadata, indent=4).encode("utf-8"))    
-        with open('{0}/mdl_version.json'.format(model_name), 'wb') as f:
-            f.write(json.dumps({'mdl_version': 1}, indent=4).encode("utf-8"))
+        if model_name != "":
+            with open('{0}/skeleton.json'.format(model_name), "wb") as f:
+                f.write(json.dumps(skel_struct, indent=4).encode("utf-8"))    
+            with open('{0}/mesh_info.json'.format(model_name), "wb") as f:
+                f.write(json.dumps(mesh_metadata, indent=4).encode("utf-8"))    
+            with open('{0}/mdl_version.json'.format(model_name), 'wb') as f:
+                f.write(json.dumps({'mdl_version': 1}, indent=4).encode("utf-8"))
+            return True
+        else:
+            return skel_struct, mesh_metadata
     return True
 
 if __name__ == "__main__":

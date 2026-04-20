@@ -1,5 +1,10 @@
-import bpy,os,json,shutil,mathutils,math,numpy,copy
-from bpy_extras.io_utils import ImportHelper, ExportHelper
+try:
+    import bpy,os,json,shutil,mathutils,math,numpy,copy
+    from bpy_extras.io_utils import ImportHelper, ExportHelper
+except ModuleNotFoundError as e:
+    print("Python module missing! {}".format(e.msg))
+    input("Press Enter to abort.")
+    raise
 ########################## Divider ##########################
 class FDK_PT_Snippets_FGOA(bpy.types.Panel):
     bl_idname = "FDK_PT_Snippets_FGOA"

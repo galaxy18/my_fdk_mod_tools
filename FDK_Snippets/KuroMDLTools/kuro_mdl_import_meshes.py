@@ -272,19 +272,20 @@ def add_node_to_BVH_list (node, node_list = [{}], i = 0): # i is current node
 def triangle_struct_to_bvh_node_list (triangle_struct):
     return (add_node_to_BVH_list(BVHNode(list(enumerate(triangle_struct))), [{}], 0))
 
-def build_mesh_section (mdl_filename, kuro_ver = 1):
+def build_mesh_section (mdl_filename, kuro_ver = 1, mesh_struct_metadata = None, mesh_nodes = None):
     # Ordinarily we do not need to parse the original file, but in case we do, we only want to do it once
     has_parsed_original_file = False
-    try:
-        mesh_struct_metadata = read_struct_from_json(mdl_filename + "/mesh_info.json")
-    except:
-        print("{0}/mesh_info.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_filename))
-        with open(mdl_filename + '.mdl', "rb") as f:
-            mdl_data = f.read()
-        mdl_data = decryptCLE(mdl_data)
-        mesh_struct = obtain_mesh_data(mdl_data, obtain_material_data(mdl_data))
-        has_parsed_original_file = True
-        mesh_struct_metadata = mesh_struct["mesh_blocks"]
+    if mesh_struct_metadata is None:
+        try:
+            mesh_struct_metadata = read_struct_from_json(mdl_filename + "/mesh_info.json")
+        except:
+            print("{0}/mesh_info.json missing or unreadable, reading data from {0}.mdl instead...".format(mdl_filename))
+            with open(mdl_filename + '.mdl', "rb") as f:
+                mdl_data = f.read()
+            mdl_data = decryptCLE(mdl_data)
+            mesh_struct = obtain_mesh_data(mdl_data, obtain_material_data(mdl_data))
+            has_parsed_original_file = True
+            mesh_struct_metadata = mesh_struct["mesh_blocks"]
     output_buffer = struct.pack("<I", len(mesh_struct_metadata))
     material_list = []
     if kuro_ver > 1:
@@ -302,27 +303,33 @@ def build_mesh_section (mdl_filename, kuro_ver = 1):
         # Initialize bounding box - I have no idea why this works, but it does.
         bbox = {'min_x': True, 'min_y': True, 'min_z': True, 'max_x': False, 'max_y': False, 'max_z': False}
         for j in range(len(mesh_struct_metadata[i]["primitives"])):
-            try:
-                mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, safe_filename, j)
-                fmt = read_fmt(mesh_filename + '.fmt')
-                ib = list(chain.from_iterable(read_ib(mesh_filename + '.ib', fmt)))
-                vb = read_vb(mesh_filename + '.vb', fmt)
-            except FileNotFoundError:
-                if kuro_ver > 1:
-                    print("Submesh {0} not found, generating an empty submesh...".format(mesh_filename))
-                    if has_parsed_original_file == False:
-                        with open(mdl_filename + '.mdl', "rb") as f:
-                            mdl_data = f.read()
-                        mdl_data = decryptCLE(mdl_data)
-                        mesh_struct = obtain_mesh_data(mdl_data, obtain_material_data(mdl_data))
-                        has_parsed_original_file = True
-                    # Generate an empty submesh
-                    fmt = make_fmt_struct(mesh_struct["mesh_buffers"][i][j])
-                    ib = []
-                    vb = mesh_struct["mesh_buffers"][i][j]['vb']
-                else:
-                    print("Submesh {0} not found, skipping...".format(mesh_filename))
-                    continue
+            if mesh_nodes is None:
+                try:
+                    mesh_filename = mdl_filename + '/{0}_{1}_{2:02d}'.format(i, safe_filename, j)
+                    fmt = read_fmt(mesh_filename + '.fmt')
+                    ib = list(chain.from_iterable(read_ib(mesh_filename + '.ib', fmt)))
+                    vb = read_vb(mesh_filename + '.vb', fmt)
+                except FileNotFoundError:
+                    if kuro_ver > 1:
+                        print("Submesh {0} not found, generating an empty submesh...".format(mesh_filename))
+                        if has_parsed_original_file == False:
+                            with open(mdl_filename + '.mdl', "rb") as f:
+                                mdl_data = f.read()
+                            mdl_data = decryptCLE(mdl_data)
+                            mesh_struct = obtain_mesh_data(mdl_data, obtain_material_data(mdl_data))
+                            has_parsed_original_file = True
+                        # Generate an empty submesh
+                        fmt = make_fmt_struct(mesh_struct["mesh_buffers"][i][j])
+                        ib = []
+                        vb = mesh_struct["mesh_buffers"][i][j]['vb']
+                    else:
+                        print("Submesh {0} not found, skipping...".format(mesh_filename))
+                        continue
+            else:
+                mesh_filename = '{0}_{1}_{2:02d}'.format(i, safe_filename, j)
+                fmt = mesh_nodes[mesh_filename + '.fmt']
+                ib = mesh_nodes[mesh_filename + '.ib']
+                vb = mesh_nodes[mesh_filename + '.vb']
             print("Processing submesh {0}...".format(mesh_filename))
             # VGMap sanity check - Make sure the .vgmap file matches the actual skin node tree
             try:

@@ -1,6 +1,11 @@
-import bpy,os,json,shutil,mathutils,math,numpy,copy
-from bpy_extras.io_utils import ImportHelper, ExportHelper
-from mathutils import Vector,Quaternion
+try:
+    import bpy,os,json,shutil,mathutils,math,numpy,copy
+    from bpy_extras.io_utils import ImportHelper, ExportHelper
+    from mathutils import Vector,Quaternion
+except ModuleNotFoundError as e:
+    print("Python module missing! {}".format(e.msg))
+    input("Press Enter to abort.")
+    raise
 ########################## Divider ##########################
 class MAIN_PT_FDKSnippets(bpy.types.Panel):
     bl_idname = "MAIN_PT_FDKSnippets"
@@ -67,7 +72,7 @@ class O_ImportRenameJSON(bpy.types.Operator, ImportHelper):
             try:
                 with open(json_file, 'r', newline='', encoding=encoding) as file:
                     fdk_rename_pair_json_data=json.load(file)
-                    context.scene["fdk_rename_pair_json_data"]=json.dumps(fdk_rename_pair_json_data)
+                    context.scene.fdk_rename_pair_json_data=json.dumps(fdk_rename_pair_json_data)
                 self.report({'INFO'}, f"JSON文件已导入({encoding}): {json_file}")
                 return {'FINISHED'}
             except UnicodeDecodeError:
@@ -101,7 +106,7 @@ class O_ImportJSON(bpy.types.Operator, ImportHelper):
             try:
                 with open(json_file, 'r', newline='', encoding=encoding) as file:
                     fdk_config_json_data=json.load(file)
-                    context.scene["fdk_config_json_data"]=json.dumps(fdk_config_json_data)
+                    context.scene.fdk_config_json_data=json.dumps(fdk_config_json_data)
                 self.report({'INFO'}, f"JSON文件已导入({encoding}): {json_file}")
                 if "CopyBone_arr_base" in fdk_config_json_data:
                     if "change_tail" in fdk_config_json_data["CopyBone_arr_base"]:
@@ -222,8 +227,8 @@ class O_RenameBone(bpy.types.Operator):
             return {'FINISHED'}
         else:
             try:
-                arr_copy=json.loads(context.scene["fdk_config_json_data"])["RenameBone_arr_copy"]["data"]
-                arr_ignore=json.loads(context.scene["fdk_config_json_data"])["RenameBone_arr_ignore"]["data"]
+                arr_copy=json.loads(context.scene.fdk_config_json_data)["RenameBone_arr_copy"]["data"]
+                arr_ignore=json.loads(context.scene.fdk_config_json_data)["RenameBone_arr_ignore"]["data"]
             except:
                 self.report({'ERROR'}, "无效的配置JSON；"+
                 "请检查RenameBone_arr_copy和RenameBone_arr_ignore。将不会复制定位骨骼")
@@ -284,7 +289,7 @@ class O_AddEmpty(bpy.types.Operator):
             return {'FINISHED'}
         else:
             try:
-                arr_addPoint=json.loads(context.scene["fdk_config_json_data"])["AddEmpty_arr_addPoint"]["data"]
+                arr_addPoint=json.loads(context.scene.fdk_config_json_data)["AddEmpty_arr_addPoint"]["data"]
             except:
                 self.report({'ERROR'}, "无效的配置JSON；请检查AddEmpty_arr_addPoint。")
                 return {'FINISHED'}
@@ -342,7 +347,7 @@ class O_CopyBone(bpy.types.Operator):
     def create_Bone(_console, _context, arm0, arm, b_orig):
         resetempty=_context.scene["fdk_opt_reset_empty"]
         try:
-            arr_add_ignore = json.loads(_context.scene["fdk_config_json_data"])["CopyBone_arr_add_ignore"]["data"]
+            arr_add_ignore = json.loads(_context.scene.fdk_config_json_data)["CopyBone_arr_add_ignore"]["data"]
         except:
             arr_add_ignore=[]
         if (arm.edit_bones.get(b_orig.name) is None) and (not b_orig.name in arr_add_ignore):
@@ -383,7 +388,7 @@ class O_CopyBone(bpy.types.Operator):
         resetempty=_context.scene["fdk_opt_reset_empty"]
         changetail=_context.scene["fdk_opt_change_tail"]
         try:
-            arr_ignore = json.loads(_context.scene["fdk_config_json_data"])["CopyBone_arr_ignore"]["data"]
+            arr_ignore = json.loads(_context.scene.fdk_config_json_data)["CopyBone_arr_ignore"]["data"]
         except:
             arr_ignore=[]
         changes=mathutils.Vector((0,0,0))
@@ -419,30 +424,30 @@ class O_CopyBone(bpy.types.Operator):
                 O_CopyBone.processname(_console, _context, arm0, arm, child)
 
     def execute(self, context):
-        if not "fdk_config_json_data" in context.scene:
+        if bpy.context.scene.fdk_config_json_data is None:
             self.report({'ERROR'}, "没有选择配置文件") 
             return {'FINISHED'}
         else:
             try:
-                arr_add_ignore = json.loads(context.scene["fdk_config_json_data"])["CopyBone_arr_add_ignore"]["data"]
+                arr_add_ignore = json.loads(context.scene.fdk_config_json_data)["CopyBone_arr_add_ignore"]["data"]
             except:
                 self.report({'INFO'}, "无效的配置JSON；CopyBone_arr_add_ignore。将忽略此配置")
             try:
-                arr_ignore = json.loads(context.scene["fdk_config_json_data"])["CopyBone_arr_ignore"]["data"]
+                arr_ignore = json.loads(context.scene.fdk_config_json_data)["CopyBone_arr_ignore"]["data"]
             except:
                 self.report({'INFO'}, "无效的配置JSON；CopyBone_arr_ignore。将忽略此配置")
             try:
-                arr_base=json.loads(context.scene["fdk_config_json_data"])["CopyBone_arr_base"]["data"]
+                arr_base=json.loads(context.scene.fdk_config_json_data)["CopyBone_arr_base"]["data"]
             except:
                 self.report({'INFO'}, "无效的配置JSON；CopyBone_arr_base。将忽略此配置")
                 arr_base=[]
             try:
-                arr_names=json.loads(context.scene["fdk_config_json_data"])["CopyBone_arr_names"]["data"]
+                arr_names=json.loads(context.scene.fdk_config_json_data)["CopyBone_arr_names"]["data"]
             except:
                 self.report({'INFO'}, "无效的配置JSON；CopyBone_arr_names。将忽略此配置")
                 arr_names=[]
             try:
-                arr_add=json.loads(context.scene["fdk_config_json_data"])["CopyBone_arr_add"]["data"]
+                arr_add=json.loads(context.scene.fdk_config_json_data)["CopyBone_arr_add"]["data"]
             except:
                 self.report({'INFO'}, "无效的配置JSON；CopyBone_arr_add。将忽略此配置")
                 arr_add=[]
@@ -515,10 +520,10 @@ class O_RenameByJSON(bpy.types.Operator):
     bl_description = "根据JSON重命名目标骨架中的骨骼"
     
     def execute(self, context):
-        if not "fdk_rename_pair_json_data" in context.scene or context.scene["fdk_rename_pair_json_data"] == "":
+        if context.scene.fdk_rename_pair_json_data == "":
             self.report({'ERROR'}, "没有选择配置文件") 
             return {'FINISHED'}
-        rename_pair=json.loads(context.scene["fdk_rename_pair_json_data"])
+        rename_pair=json.loads(context.scene.fdk_rename_pair_json_data)
         arm=bpy.data.objects.get(bpy.context.active_object.name).data
         idx=0
         names=[]
@@ -688,10 +693,10 @@ class O_remove_Empty_Bone(bpy.types.Operator):
             baseobj = bpy.context.active_object
         arm = bpy.data.objects.get(baseobj.name).data
         try:
-            arr_shouldkeep=json.loads(context.scene["fdk_config_json_data"])["RemoveBone_arr_shouldKeep"]["data"]
+            arr_shouldkeep=json.loads(context.scene.fdk_config_json_data)["RemoveBone_arr_shouldKeep"]["data"]
         except:
             arr_shouldkeep=[]
-        remove_no_child_only = json.loads(context.scene["fdk_config_json_data"])["RemoveBone_arr_shouldKeep"]["remove_no_child_only"]==True
+        remove_no_child_only = json.loads(context.scene.fdk_config_json_data)["RemoveBone_arr_shouldKeep"]["remove_no_child_only"]==True
         
         self.report({'INFO'},f"O_remove_Empty_Bone collecting...")
         for obj in bpy.data.objects:
