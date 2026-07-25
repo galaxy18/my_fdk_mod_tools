@@ -383,6 +383,22 @@ class O_CopyBone(bpy.types.Operator):
                 O_CopyBone.create_Parent(arm0, arm, b_orig.parent)
             b.parent = arm.edit_bones[b_orig.parent.name]
 
+    def applychanges(_console,b_ref, b_target, changes_head, changes_tail,arr_ignore,arm0,changematrix,resetempty,changetail,processchild):
+        _console.report({'INFO'}, "Moving bone "+b_target.name)
+        if changetail == True:
+            b_target.tail = b_target.tail-changes_head
+        else:
+            b_target.tail = b_target.tail-changes_tail
+        b_target.head = b_target.head-changes_head
+        if changematrix==True:
+            b_target.matrix = b_ref.matrix
+        #if not b_target.parent is None:
+        #    b_target.parent = b_ref.parent
+        if processchild:
+            for child in b_target.children:
+                if not child.name in arr_ignore:
+                    O_CopyBone.applychanges(_console,b_target, child, changes_head, changes_tail,arr_ignore,arm0,changematrix,resetempty,changetail,processchild)
+        
     def processname(_console, _context, arm0, arm, b_child, processchild=True):
         changematrix=_context.scene["fdk_opt_change_matrix"]
         resetempty=_context.scene["fdk_opt_reset_empty"]
@@ -396,21 +412,25 @@ class O_CopyBone(bpy.types.Operator):
             if arm.edit_bones.get(b_child.name) is None:
                 O_CopyBone.create_Bone(_console, _context, arm0, arm, b_child)
             elif not b_child.name in arr_ignore:
-                _console.report({'INFO'}, "Moving bone "+b_child.name)
                 b=arm.edit_bones[b_child.name]
                 changes=mathutils.Vector((b.head[0]-b_child.head[0],
                     b.head[1]-b_child.head[1],
                     b.head[2]-b_child.head[2]))
+                changes_tail=mathutils.Vector((b.tail[0]-b_child.tail[0],
+                    b.tail[1]-b_child.tail[1],
+                    b.tail[2]-b_child.tail[2]))
                 #_console.report({'INFO'}, f"changes: {changes}")
-                if changetail == True:
-                    b.tail = b.tail-changes
-                else:
-                    b.tail = b_child.tail
-                b.head = b_child.head
-                if changematrix==True:
-                    b.matrix = b_child.matrix
-                if not b_child.parent is None:
-                    b.parent = b_child.parent
+                O_CopyBone.applychanges(_console,b_child, b, changes, changes_tail,arr_ignore,arm0,changematrix,resetempty,changetail,processchild)
+                #if changetail == True:
+                #    b.tail = b.tail-changes
+                #else:
+                #    b.tail = b_child.tail
+                #b.head = b_child.head
+                #if changematrix==True:
+                #    b.matrix = b_child.matrix
+                #if not b_child.parent is None:
+                #    b.parent = b_child.parent
+                            
             if resetempty == True:
                 for obj in bpy.data.objects:
                     if obj.parent_type=='BONE' and obj.parent_bone == b_child.name and obj.type == "EMPTY":

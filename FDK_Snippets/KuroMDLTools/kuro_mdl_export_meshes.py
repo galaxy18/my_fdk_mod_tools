@@ -102,6 +102,7 @@ def isolate_skeleton_data (mdl_data):
 
 def obtain_skeleton_data (mdl_data):
     skel_data = isolate_skeleton_data(mdl_data)
+    kuro_ver = get_kuro_ver(mdl_data)
     if skel_data == False:
         return False
     with io.BytesIO(skel_data) as f:
@@ -119,6 +120,8 @@ def obtain_skeleton_data (mdl_data):
             node_block['rotation_euler_rpy'] = struct.unpack("<3f",f.read(12))
             node_block['scale'] = struct.unpack("<3f",f.read(12))
             node_block['unknown'] = struct.unpack("<3f",f.read(12))
+            if kuro_ver > 4:
+                node_block['unknown2'], = struct.unpack("<I",f.read(4))
             child_count, = struct.unpack("<I",f.read(4))
             node_block['children'] = []
             for j in range(child_count):
@@ -583,12 +586,12 @@ def process_mdl (mdl_file, mdl_data, complete_maps = complete_vgmaps_default, tr
                 f.write(json.dumps({'mdl_version': get_kuro_ver(mdl_data)}, indent=4).encode("utf-8"))
             with open(mesh_json_filename, 'wb') as f:
                 f.write(json.dumps(mesh_struct["mesh_blocks"], indent=4).encode("utf-8"))
-            with open(skel_json_filename, 'wb') as f:
-                f.write(json.dumps(skel_struct, indent=4).encode("utf-8"))
         with open(material_json_filename, 'wb') as f:
             f.write(json.dumps(material_struct, indent=4).encode("utf-8"))
         with open(image_json_filename, 'wb') as f:
             f.write(json.dumps(image_list, indent=4).encode("utf-8"))
+        with open(skel_json_filename, 'wb') as f:
+            f.write(json.dumps(skel_struct, indent=4).encode("utf-8"))
         if jsonOnly == False:
             for i in range(len(mesh_struct["mesh_buffers"])):
                 safe_filename = "".join([x if x not in "\\/:*?<>|" else "_" for x in mesh_struct["mesh_blocks"][i]["name"]])

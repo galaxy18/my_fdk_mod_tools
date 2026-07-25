@@ -52,12 +52,12 @@ class FDK_PT_Snippets_FGOA(bpy.types.Panel):
         box = layout.box()
         col = box.column(align=True)
         col.label(text="依照json重组目标骨架")
-        if not context.scene.fdk_moving_pair_json_data:
+        if not context.scene["fdk_moving_pair_json_data"]:
             col.operator(O_ImportMovingJSON.bl_idname, icon="IMPORT")#重命名配对JSON
         else:
             col.operator(O_ImportMovingJSON.bl_idname, icon="IMPORT", text="重选配对JSON")
         O_RenameByJSONcol = box.column(align=True)
-        if (not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")) or (not context.scene.fdk_moving_pair_json_data):
+        if (not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")) or (not context.scene["fdk_moving_pair_json_data"]):
             O_RenameByJSONcol.enabled = False
         O_RenameByJSONcol.operator(O_MoveByJSON.bl_idname, text=O_MoveByJSON.bl_label, icon="BONE_DATA")
 ########################## Divider ##########################
