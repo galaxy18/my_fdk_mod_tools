@@ -644,6 +644,8 @@ class O_ConvertMDL(bpy.types.Operator, ImportHelper):
     
     def execute(self, context):
         mdl_file = self.filepath
+        if (not mdl_file.endswith('.mdl')) and (not mdl_file.endswith('.mdl.bak')):
+            mdl_file = mdl_file+'.mdl';
         if not mdl_file or not os.path.exists(mdl_file):
             self.report({'ERROR'}, "请选择mdl文件")
             return {'CANCELLED'}
@@ -666,6 +668,8 @@ class O_ExportMDLJson(bpy.types.Operator, ImportHelper):
     
     def execute(self, context):
         mdl_file = self.filepath
+        if (not mdl_file.endswith('.mdl')) and (not mdl_file.endswith('.mdl.bak')):
+            mdl_file = mdl_file+'.mdl';
         if not mdl_file or not os.path.exists(mdl_file):
             self.report({'ERROR'}, "请选择mdl文件")
             return {'CANCELLED'}
@@ -688,6 +692,8 @@ class O_ExportMDLMetadata(bpy.types.Operator, ImportHelper):
     
     def execute(self, context):
         mdl_file = self.filepath
+        if (not mdl_file.endswith('.mdl')) and (not mdl_file.endswith('.mdl.bak')):
+            mdl_file = mdl_file+'.mdl';
         if not mdl_file or not os.path.exists(mdl_file):
             self.report({'ERROR'}, "请选择mdl文件")
             return {'CANCELLED'}
@@ -710,6 +716,8 @@ class O_ExportMDL(bpy.types.Operator, ImportHelper):
     
     def execute(self, context):
         mdl_file = self.filepath
+        if (not mdl_file.endswith('.mdl')) and (not mdl_file.endswith('.mdl.bak')):
+            mdl_file = mdl_file+'.mdl';
         if not mdl_file or not os.path.exists(mdl_file):
             self.report({'ERROR'}, "请选择mdl文件")
             return {'CANCELLED'}
@@ -733,6 +741,8 @@ class O_ImportMaterial(bpy.types.Operator, ImportHelper):
     def execute(self, context):
         import sys
         mdl_file = self.filepath
+        if (not mdl_file.endswith('.mdl')) and (not mdl_file.endswith('.mdl.bak')):
+            mdl_file = mdl_file+'.mdl';
         if not mdl_file or not os.path.exists(mdl_file):
             self.report({'ERROR'}, "请选择文件")
             return {'CANCELLED'}
@@ -798,6 +808,8 @@ class O_ImportMDL(bpy.types.Operator, ImportHelper):
         import sys
         LIST_OT_SaveItem.execute(self, context)
         mdl_file = self.filepath
+        if (not mdl_file.endswith('.mdl')) and (not mdl_file.endswith('.mdl.bak')):
+            mdl_file = mdl_file+'.mdl';
         if not mdl_file or not os.path.exists(mdl_file):
             self.report({'ERROR'}, "请选择mdl文件")
             return {'CANCELLED'}
@@ -925,6 +937,8 @@ class O_UpdateMDL(bpy.types.Operator, ImportHelper):
         mdl_file = self.filepath
         kuro_ver = 1
         change_compression = False
+        if (not mdl_file.endswith('.mdl')) and (not mdl_file.endswith('.mdl.bak')):
+            mdl_file = mdl_file+'.mdl';
         if not mdl_file or not os.path.exists(mdl_file):
             self.report({'ERROR'}, "请选择mdl文件")
             return {'CANCELLED'}

@@ -1,7 +1,7 @@
 bl_info = {
     "name": "FDK Snippets",
     "author": "",
-    "version": (1, 0, 10),
+    "version": (1, 0, 11),
     "blender": (4, 2, 3),
     "location": "View3D > Tool Shelf >FDK_Snippets Panel",
     "description": "FDK MOD制作 快捷代码",
@@ -29,6 +29,7 @@ bl_info = {
 #1.1.8:尝试不依靠输出文件更新mdl
 #1.1.9:支持选取.mdl.bak文件；修复了作者忘了给变量改个独特点的名字的问题
 #1.1.10:kuro_mdl_tools更新到v166 支持京轨的mdl v5
+#1.1.11:小改进：导入mdl时如果没写后缀，会自动尝试补充mdl后缀，方便直接输入文件名进行导入
 ########################## Divider ##########################
 from . import panel, sub_kuro_mdl_tools, sub_others
 
