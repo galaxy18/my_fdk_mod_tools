@@ -6,6 +6,27 @@ except ModuleNotFoundError as e:
     input("Press Enter to abort.")
     raise
 ########################## Divider ##########################
+class FDK_PT_Snippets_YS9(bpy.types.Panel):
+    bl_idname = "FDK_PT_Snippets_YS9"
+    bl_label = "YS9用"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'FDK_Snippets'
+    #bl_options = {'DEFAULT_CLOSED'} #默认折叠
+    
+    @classmethod
+    def poll(cls, context):
+        return context.scene.active_xbone_subpanel == 'Others'
+        
+    def draw(self, context):
+        layout = self.layout
+        
+        box = layout.box()
+        col = box.column(align=True)
+        col.operator(O_removeAlphaLink.bl_idname, icon="ACTION")#断开Alpha
+        col.operator(O_removeBackfaceCulling.bl_idname, icon="ACTION")#移除背面剔除
+    
+########################## Divider ##########################
 class FDK_PT_Snippets_FGOA(bpy.types.Panel):
     bl_idname = "FDK_PT_Snippets_FGOA"
     bl_label = "FGOA用"
@@ -353,6 +374,55 @@ class O_MoveByJSON(bpy.types.Operator):
         self.report({'INFO'},f"O_MoveByJSON finished")
         return {'FINISHED'}
 ########################## Divider ##########################
+class O_removeAlphaLink(bpy.types.Operator):
+    bl_idname = "fdktools.remove_alpha_links"
+    bl_label = "断开Alpha"
+    bl_description = "断开Alpha"
+    bl_options = {'UNDO'}
+    
+    def execute(self, context):
+        # import bpy
+        # from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
+        for mat in bpy.data.materials:
+            if mat.node_tree is None:
+                continue
+            nodes = mat.node_tree.nodes
+            for node in nodes:
+                # print(node.bl_idname)
+                if node.bl_idname == "ShaderNodeBsdfPrincipled":
+                    # print(len(node.inputs["Alpha"].links))
+                    node.inputs["Alpha"].default_value = 1
+                    for link in node.inputs["Alpha"].links:
+                        mat.node_tree.links.remove(link)
+        return {'FINISHED'}
+        
+class O_removeAlphaLink2(bpy.types.Operator):
+    bl_idname = "fdktools.remove_alpha_links2"
+    bl_label = "断开Alpha2"
+    bl_description = "断开Alpha2"
+    bl_options = {'UNDO'}
+    
+    def execute(self, context):
+        # import bpy
+        # from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
+        for mat in bpy.data.materials:
+            mat.blend_method = 'OPAQUE'
+        return {'FINISHED'}
+                        
+class O_removeBackfaceCulling(bpy.types.Operator):
+    bl_idname = "fdktools.remove_backface_culling"
+    bl_label = "移除背面剔除"
+    bl_description = "移除背面剔除"
+    bl_options = {'UNDO'}
+    
+    def execute(self, context):
+        for mat in bpy.data.materials:
+            mat.use_backface_culling = False
+            mat.use_backface_culling_shadow = False
+            mat.use_backface_culling_lightprobe_volume = False
+        return {'FINISHED'}
+
+########################## Divider ##########################
 classes = [
     FDK_PT_Snippets_FGOA,
     O_attach_Armatures,
@@ -361,7 +431,10 @@ classes = [
     O_copy_Bone_Pos2,
     O_copy_Bone_Pos3,
     O_ImportMovingJSON,
-    O_MoveByJSON
+    O_MoveByJSON,
+    FDK_PT_Snippets_YS9,
+    O_removeAlphaLink,
+    O_removeBackfaceCulling
 ]
 ########################## Divider ##########################
 def register():
