@@ -6,27 +6,6 @@ except ModuleNotFoundError as e:
     input("Press Enter to abort.")
     raise
 ########################## Divider ##########################
-class FDK_PT_Snippets_YS9(bpy.types.Panel):
-    bl_idname = "FDK_PT_Snippets_YS9"
-    bl_label = "YS9用"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = 'FDK_Snippets'
-    #bl_options = {'DEFAULT_CLOSED'} #默认折叠
-    
-    @classmethod
-    def poll(cls, context):
-        return context.scene.active_xbone_subpanel == 'Others'
-        
-    def draw(self, context):
-        layout = self.layout
-        
-        box = layout.box()
-        col = box.column(align=True)
-        col.operator(O_removeAlphaLink.bl_idname, icon="ACTION")#断开Alpha
-        col.operator(O_removeBackfaceCulling.bl_idname, icon="ACTION")#移除背面剔除
-    
-########################## Divider ##########################
 class FDK_PT_Snippets_FGOA(bpy.types.Panel):
     bl_idname = "FDK_PT_Snippets_FGOA"
     bl_label = "FGOA用"
@@ -73,12 +52,12 @@ class FDK_PT_Snippets_FGOA(bpy.types.Panel):
         box = layout.box()
         col = box.column(align=True)
         col.label(text="依照json重组目标骨架")
-        if not context.scene["fdk_moving_pair_json_data"]:
+        if (not "fdk_moving_pair_json_data" in context.scene):
             col.operator(O_ImportMovingJSON.bl_idname, icon="IMPORT")#重命名配对JSON
         else:
             col.operator(O_ImportMovingJSON.bl_idname, icon="IMPORT", text="重选配对JSON")
         O_RenameByJSONcol = box.column(align=True)
-        if (not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")) or (not context.scene["fdk_moving_pair_json_data"]):
+        if (not (bpy.context.active_object and bpy.context.active_object.type=="ARMATURE")) or (not "fdk_moving_pair_json_data" in context.scene):
             O_RenameByJSONcol.enabled = False
         O_RenameByJSONcol.operator(O_MoveByJSON.bl_idname, text=O_MoveByJSON.bl_label, icon="BONE_DATA")
 ########################## Divider ##########################
@@ -87,6 +66,7 @@ class O_attach_Armatures(bpy.types.Operator):
     bl_idname = "fdktools.attach_bones"
     bl_label = "Attach"
     bl_description = "添加到选中骨骼做子级"
+    bl_options = {'UNDO'}
     
     #https://stackoverflow.com/questions/2556108/rreplace-how-to-replace-the-last-occurrence-of-an-expression-in-a-string
     def rreplace(s, old, new, occurrence):
@@ -150,6 +130,7 @@ class O_attach_Armatures2(bpy.types.Operator):
     bl_idname = "fdktools.attach_bones2"
     bl_label = "Attach2"
     bl_description = "添加到选中骨骼做子级"
+    bl_options = {'UNDO'}
     
     def execute(self, context):
         #bpy.ops.transform.translate(value=(0, 0, 1), orient_type='GLOBAL')
@@ -220,6 +201,8 @@ class O_copy_Bone_Pos(bpy.types.Operator):
     bl_idname = "fdktools.copy_bonepos"
     bl_label = "复制骨节位置"
     bl_description = "在编辑模式选中两段骨节复制位置"
+    bl_options = {'UNDO'}
+    
     def execute(self, context):
         if not bpy.context.object.mode == 'EDIT':
             self.report({'ERROR'},f"必须是编辑模式")
@@ -248,6 +231,8 @@ class O_copy_Bone_Pos2(bpy.types.Operator):
     bl_idname = "fdktools.copy_bonepos2"
     bl_label = "复制骨节位置2"
     bl_description = "在编辑模式选中两段骨节复制位置，不移动尾端"
+    bl_options = {'UNDO'}
+    
     def execute(self, context):
         if not bpy.context.object.mode == 'EDIT':
             self.report({'ERROR'},f"必须是编辑模式")
@@ -275,6 +260,8 @@ class O_copy_Bone_Pos3(bpy.types.Operator):
     bl_idname = "fdktools.copy_bonepos3"
     bl_label = "复制骨节位置3"
     bl_description = "在编辑模式选中两段骨节复制位置，复制matrix"
+    bl_options = {'UNDO'}
+    
     def execute(self, context):
         if not bpy.context.object.mode == 'EDIT':
             self.report({'ERROR'},f"必须是编辑模式")
@@ -307,6 +294,7 @@ class O_ImportMovingJSON(bpy.types.Operator, ImportHelper):
         default="*.json",
         options={'HIDDEN'},
     )
+    bl_options = {'UNDO'}
     
     def execute(self, context):
         json_file = self.filepath
@@ -334,6 +322,7 @@ class O_MoveByJSON(bpy.types.Operator):
     bl_idname = "fdktools.move_by_json"
     bl_label = "根据JSON重组"
     bl_description = "根据JSON修改目标骨架父子级关系"
+    bl_options = {'UNDO'}
     
     def execute(self, context):
         if not "fdk_moving_pair_json_data" in context.scene or context.scene["fdk_moving_pair_json_data"] == "":
@@ -374,6 +363,46 @@ class O_MoveByJSON(bpy.types.Operator):
         self.report({'INFO'},f"O_MoveByJSON finished")
         return {'FINISHED'}
 ########################## Divider ##########################
+
+########################## Divider ##########################
+class FDK_PT_Snippets_YS9(bpy.types.Panel):
+    bl_idname = "FDK_PT_Snippets_YS9"
+    bl_label = "YS9用"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'FDK_Snippets'
+    #bl_options = {'DEFAULT_CLOSED'} #默认折叠
+    
+    @classmethod
+    def poll(cls, context):
+        return context.scene.active_xbone_subpanel == 'Others'
+        
+    def draw(self, context):
+        from . import panel
+        layout = self.layout
+        
+        box = layout.box()
+        col = box.column(align=True)
+        col.label(text="注意：以下都是全局操作")
+        
+        col = box.column(align=True)
+        col.operator(panel.O_del_glTF_not.bl_idname)
+        col.operator(panel.O_delEmpty.bl_idname)
+        
+        col = box.column(align=True)
+        col.operator(O_removeArmatures.bl_idname)#移除骨架
+        col.operator(O_removeBackfaceCulling.bl_idname)#背面剔除
+        col.operator(O_removeAlphaLink.bl_idname)#断开Alpha
+        
+        col = box.column(align=True)
+        col.label(text="背面剔除体积光照探头")
+        row = col.row()
+        row.operator(O_removeBackfaceCullingLight.bl_idname)#背面剔除
+        row.operator(O_recoverBackfaceCullingLight.bl_idname)#背面剔除
+        
+        col = box.column(align=True)
+        col.operator(O_removeVERTEXCOLOR.bl_idname)
+########################## Divider ##########################
 class O_removeAlphaLink(bpy.types.Operator):
     bl_idname = "fdktools.remove_alpha_links"
     bl_label = "断开Alpha"
@@ -384,6 +413,7 @@ class O_removeAlphaLink(bpy.types.Operator):
         # import bpy
         # from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
         for mat in bpy.data.materials:
+            mat.blend_method = 'OPAQUE'
             if mat.node_tree is None:
                 continue
             nodes = mat.node_tree.nodes
@@ -395,33 +425,68 @@ class O_removeAlphaLink(bpy.types.Operator):
                     for link in node.inputs["Alpha"].links:
                         mat.node_tree.links.remove(link)
         return {'FINISHED'}
-        
-class O_removeAlphaLink2(bpy.types.Operator):
-    bl_idname = "fdktools.remove_alpha_links2"
-    bl_label = "断开Alpha2"
-    bl_description = "断开Alpha2"
-    bl_options = {'UNDO'}
-    
-    def execute(self, context):
-        # import bpy
-        # from bpy_extras.node_shader_utils import PrincipledBSDFWrapper
-        for mat in bpy.data.materials:
-            mat.blend_method = 'OPAQUE'
-        return {'FINISHED'}
                         
 class O_removeBackfaceCulling(bpy.types.Operator):
     bl_idname = "fdktools.remove_backface_culling"
     bl_label = "移除背面剔除"
-    bl_description = "移除背面剔除"
+    bl_description = "因为游戏的sample里保留了体积光照探头，这里也作保留"
     bl_options = {'UNDO'}
     
     def execute(self, context):
         for mat in bpy.data.materials:
             mat.use_backface_culling = False
             mat.use_backface_culling_shadow = False
-            mat.use_backface_culling_lightprobe_volume = False
+            # mat.use_backface_culling_lightprobe_volume = True
         return {'FINISHED'}
 
+class O_removeArmatures(bpy.types.Operator):
+    bl_idname = "fdktools.remove_armatures"
+    bl_label = "移除骨架"
+    bl_description = "移除骨架"
+    bl_options = {'UNDO'}
+    
+    def execute(self, context):
+        for obj in bpy.data.objects:
+            if obj.type=="ARMATURE":
+                bpy.data.objects.remove(obj, do_unlink=True)
+        return {'FINISHED'}
+        
+class O_removeBackfaceCullingLight(bpy.types.Operator):
+    bl_idname = "fdktools.remove_backface_culling_light"
+    bl_label = "全部OFF"
+    bl_description = ""
+    bl_options = {'UNDO'}
+    
+    def execute(self, context):
+        for mat in bpy.data.materials:
+            mat.use_backface_culling_lightprobe_volume = False
+        return {'FINISHED'}
+        
+class O_recoverBackfaceCullingLight(bpy.types.Operator):
+    bl_idname = "fdktools.recover_backface_culling_light"
+    bl_label = "全部ON"
+    bl_description = ""
+    bl_options = {'UNDO'}
+    
+    def execute(self, context):
+        for mat in bpy.data.materials:
+            mat.use_backface_culling_lightprobe_volume = True
+        return {'FINISHED'}
+        
+class O_removeVERTEXCOLOR(bpy.types.Operator):
+    bl_idname = "fdktools.remove_vertexcolor"
+    bl_label = "移除ShaderNodeVertexColor"
+    bl_description = ""
+    bl_options = {'UNDO'}
+    
+    def execute(self, context):
+        for mat in bpy.data.materials:
+            if not mat.node_tree:
+                continue
+            nodes_to_remove = [node for node in mat.node_tree.nodes if node.type == 'VERTEX_COLOR']
+            for node in nodes_to_remove:
+                mat.node_tree.nodes.remove(node)
+        return {'FINISHED'}
 ########################## Divider ##########################
 classes = [
     FDK_PT_Snippets_FGOA,
@@ -434,7 +499,11 @@ classes = [
     O_MoveByJSON,
     FDK_PT_Snippets_YS9,
     O_removeAlphaLink,
-    O_removeBackfaceCulling
+    O_removeBackfaceCulling,
+    O_removeBackfaceCullingLight,
+    O_recoverBackfaceCullingLight,
+    O_removeArmatures,
+    O_removeVERTEXCOLOR
 ]
 ########################## Divider ##########################
 def register():

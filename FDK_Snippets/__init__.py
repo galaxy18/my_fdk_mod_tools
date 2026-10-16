@@ -1,10 +1,10 @@
 bl_info = {
     "name": "FDK Snippets",
     "author": "",
-    "version": (1, 0, 12),
+    "version": (1, 1, 13),
     "blender": (4, 2, 3),
     "location": "View3D > Tool Shelf >FDK_Snippets Panel",
-    "description": "FDK MOD制作 快捷代码",
+    "description": "FDK MOD制作 快捷代码集",
     "warning": "",
     "wiki_url": "",
     "category": "3D View",
@@ -31,6 +31,7 @@ bl_info = {
 #1.1.10:kuro_mdl_tools更新到v166 支持京轨的mdl v5
 #1.1.11:小改进：导入mdl时如果没写后缀，会自动尝试补充mdl后缀，方便直接输入文件名进行导入
 #1.1.12:针对伊苏9模型移植tiny glade，增加快捷操作
+#1.1.13:部分动作增加支持撤销；导入mdl时可以批量选取文件
 ########################## Divider ##########################
 from . import panel, sub_kuro_mdl_tools, sub_others
 

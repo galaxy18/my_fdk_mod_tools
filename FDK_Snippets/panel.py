@@ -596,6 +596,7 @@ class O_delEmpty(bpy.types.Operator):
     bl_idname = "fdktools.remove_empty_object"
     bl_label = "⚠移除空物体"
     bl_description = "移除空物体，会导致丢失配件，如需要保留请勿使用此功能"
+    bl_options = {'UNDO'}
     
     def execute(self, context):
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -671,6 +672,7 @@ class O_del_glTF_not(bpy.types.Operator):
     bl_idname = "fdktools.remove_gltf_collection"
     bl_label = "清理glTF_not_exported"
     bl_description = "清理glTF_not_exported"
+    bl_options = {'UNDO'}
     
     def execute(self, context):
         bpy.ops.object.select_all(action='DESELECT')

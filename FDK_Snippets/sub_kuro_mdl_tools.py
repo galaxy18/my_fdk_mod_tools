@@ -90,6 +90,7 @@ class P_UL_Metadata_List(bpy.types.UIList):
 class LIST_OT_SelectAll(bpy.types.Operator):
     bl_idname = "fdktools.select_all"
     bl_label = "unselect all"
+    bl_options = {'UNDO'}
     def execute(self, context):
         for item in context.scene.fdk_material_list:
             item.enabled = True
@@ -98,6 +99,7 @@ class LIST_OT_SelectAll(bpy.types.Operator):
 class LIST_OT_UnselectAll(bpy.types.Operator):
     bl_idname = "fdktools.unselect_all"
     bl_label = "unselect all"
+    bl_options = {'UNDO'}
     def execute(self, context):
         for item in context.scene.fdk_material_list:
             item.enabled = False
@@ -106,6 +108,7 @@ class LIST_OT_UnselectAll(bpy.types.Operator):
 class LIST_OT_CopyItem(bpy.types.Operator):
     bl_idname = "fdktools.copy_item"
     bl_label = "Add a new item"
+    bl_options = {'UNDO'}
     @classmethod
     def poll(cls, context):
         return context.scene.fdk_material_list
@@ -124,6 +127,7 @@ class LIST_OT_CopyItem(bpy.types.Operator):
 class LIST_OT_DeleteItem(bpy.types.Operator):
     bl_idname = "fdktools.delete_item"
     bl_label = "Deletes an item"
+    bl_options = {'UNDO'}
     @classmethod
     def poll(cls, context):
         return context.scene.fdk_material_list
@@ -137,6 +141,7 @@ class LIST_OT_DeleteItem(bpy.types.Operator):
 class LIST_OT_ExportItem(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.export_item"
     bl_label = "Export"
+    bl_options = {'UNDO'}
     directory: bpy.props.StringProperty(
         name="Outdir Path",
         description="Where I will save my stuff"
@@ -185,6 +190,7 @@ class LIST_OT_ExportItem(bpy.types.Operator, ImportHelper):
 class LIST_OT_MoveItem(bpy.types.Operator):
     bl_idname = "fdktools.move_item"
     bl_label = "Move an item in the list"
+    bl_options = {'UNDO'}
     direction: bpy.props.EnumProperty(items=(('UP', 'Up', ""), ('DOWN', 'Down', ""),))
     @classmethod
     def poll(cls, context):
@@ -205,6 +211,7 @@ class LIST_OT_MoveItem(bpy.types.Operator):
 class LIST_OT_SaveItem(bpy.types.Operator):
     bl_idname = "fdktools.save_item"
     bl_label = ""
+    bl_options = {'UNDO'}
     def execute(self, context):
         if context.scene.get("kuromdlmetadata") is None:
             print('')
@@ -248,6 +255,7 @@ class LIST_OT_SaveItem(bpy.types.Operator):
 class LIST_OT_LoadItem(bpy.types.Operator):
     bl_idname = "fdktools.load_item"
     bl_label = ""
+    bl_options = {'UNDO'}
     def execute(self, context):
         if context.scene.get("kuromdlmetadata") is None:
             print('')
@@ -737,6 +745,7 @@ class O_ImportMaterial(bpy.types.Operator, ImportHelper):
         default="*.mdl;*.json",
         options={'HIDDEN'},
     )
+    bl_options = {'UNDO'}
     
     def execute(self, context):
         import sys
@@ -798,85 +807,96 @@ class O_ImportMDL(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.mdl_import"
     bl_label = "导入MDL"
     bl_description = "将MDL转换为GLB数据并直接导入"
+    bl_options = {'UNDO'}
     filename_ext = ".mdl"
     filter_glob: bpy.props.StringProperty(
         default="*.mdl;*.mdl.bak*",
         options={'HIDDEN'},
     )
+    directory: bpy.props.StringProperty(
+        name="directory",
+        description=""
+    )
+    files: bpy.props.CollectionProperty(
+        type=bpy.types.OperatorFileListElement,
+        options={"HIDDEN", "SKIP_SAVE"},
+    )
     
     def execute(self, context):
         import sys
         LIST_OT_SaveItem.execute(self, context)
-        mdl_file = self.filepath
-        if (not mdl_file.endswith('.mdl')) and (not mdl_file.endswith('.mdl.bak')):
-            mdl_file = mdl_file+'.mdl';
-        if not mdl_file or not os.path.exists(mdl_file):
-            self.report({'ERROR'}, "请选择mdl文件")
-            return {'CANCELLED'}
+        filepaths = [self.directory + f.name for f in self.files]
+        for mdl_file in filepaths:
+            # mdl_file = self.filepath
+            if (not mdl_file.endswith('.mdl')) and (not mdl_file.endswith('.mdl.bak')):
+                mdl_file = mdl_file+'.mdl';
+            if not mdl_file or not os.path.exists(mdl_file):
+                self.report({'ERROR'}, "请选择mdl文件")
+                return {'CANCELLED'}
+                
+            self.report({'INFO'}, f"Processing {mdl_file}")
+            with open(mdl_file, "rb") as f:
+                mdl_data = f.read()
             
-        self.report({'INFO'}, f"Processing {mdl_file}")
-        with open(mdl_file, "rb") as f:
-            mdl_data = f.read()
-        
-        material_struct = kuro_mdl_export_meshes.obtain_material_data(mdl_data)
-        gltf_data, giant_buffer, gltf_metadata = kuro_mdl_to_basic_gltf.process_mdl(mdl_file, mdl_data, True, False, False, True, False, context.scene.fdk_opt_usedds)
-        
-        if bpy.context.scene.get("kuromdlmetadata") is None:
-            bpy.context.scene["kuromdlmetadata"] = "[]"
-        
-        localstorage = json.loads(bpy.context.scene["kuromdlmetadata"]);
-        localstorage.append({
-            f"{bpy.path.display_name_from_filepath(mdl_file)}_material_struct":{"data":material_struct,"type":'material_struct'},
-            f"{bpy.path.display_name_from_filepath(mdl_file)}_gltf_metadata":{"data":gltf_metadata,"type":'gltf_metadata'}
-        })
-        
-        bpy.context.scene["kuromdlmetadata"] = json.dumps(localstorage)
-        LIST_OT_LoadItem.execute(self, context)
-        #return {'FINISHED'}
-        import_settings = self.as_keywords()
-        user_extensions = []
-        preferences = bpy.context.preferences
-        for addon_name in preferences.addons.keys():
-            try:
-                module = sys.modules[addon_name]
-            except Exception:
-                continue
-            if hasattr(module, 'glTF2ImportUserExtension'):
-                extension_ctor = module.glTF2ImportUserExtension
-                user_extensions.append(extension_ctor())
-        import_settings['import_user_extensions'] = user_extensions
-        import_settings['import_shading'] = "NORMALS"
-        
-        import_settings['merge_vertices'] = True
-        import_settings['import_merge_material_slots'] = True
-        
-        import_settings['import_pack_images'] = True
-        import_settings['import_webp_texture'] = False
-        import_settings['import_unused_materials'] = False
-        
-        import_settings['bone_heuristic'] = "BLENDER"
-        import_settings['guess_original_bind_pose'] = True
-        import_settings['disable_bone_shape'] = False
-        import_settings['bone_shape_scale_factor'] = 1.0
-        
-        import_settings['import_scene_as_collection'] = True
-        import_settings['import_select_created_objects'] = True
-        import_settings['import_scene_extras'] = True
-        
-        gltf_importer=glTFImporter(mdl_file, import_settings)
-        gltf_importer.data=gltf_from_dict(gltf_data)
-        #self.report({'INFO'}, f"debug: {gltf_importer.data.nodes}")
-        gltf_importer.glb_buffer=giant_buffer
-        BlenderGlTF.create(gltf_importer)
-        
-        bpy.ops.object.select_all(action='DESELECT')
-        collection = bpy.data.collections.get('glTF_not_exported')
-        if not collection is None:
-            bpy.data.collections.remove(collection)
-        for obj in bpy.data.objects:
-            if obj.type == "ARMATURE":
-                for bone in obj.pose.bones:
-                    bone.custom_shape = None
+            material_struct = kuro_mdl_export_meshes.obtain_material_data(mdl_data)
+            gltf_data, giant_buffer, gltf_metadata = kuro_mdl_to_basic_gltf.process_mdl(mdl_file, mdl_data, True, False, False, True, False, context.scene.fdk_opt_usedds)
+            
+            if bpy.context.scene.get("kuromdlmetadata") is None:
+                bpy.context.scene["kuromdlmetadata"] = "[]"
+            
+            localstorage = json.loads(bpy.context.scene["kuromdlmetadata"]);
+            localstorage.append({
+                f"{bpy.path.display_name_from_filepath(mdl_file)}_material_struct":{"data":material_struct,"type":'material_struct'},
+                f"{bpy.path.display_name_from_filepath(mdl_file)}_gltf_metadata":{"data":gltf_metadata,"type":'gltf_metadata'}
+            })
+            
+            bpy.context.scene["kuromdlmetadata"] = json.dumps(localstorage)
+            LIST_OT_LoadItem.execute(self, context)
+            #return {'FINISHED'}
+            import_settings = self.as_keywords()
+            user_extensions = []
+            preferences = bpy.context.preferences
+            for addon_name in preferences.addons.keys():
+                try:
+                    module = sys.modules[addon_name]
+                except Exception:
+                    continue
+                if hasattr(module, 'glTF2ImportUserExtension'):
+                    extension_ctor = module.glTF2ImportUserExtension
+                    user_extensions.append(extension_ctor())
+            import_settings['import_user_extensions'] = user_extensions
+            import_settings['import_shading'] = "NORMALS"
+            
+            import_settings['merge_vertices'] = True
+            import_settings['import_merge_material_slots'] = True
+            
+            import_settings['import_pack_images'] = True
+            import_settings['import_webp_texture'] = False
+            import_settings['import_unused_materials'] = False
+            
+            import_settings['bone_heuristic'] = "BLENDER"
+            import_settings['guess_original_bind_pose'] = True
+            import_settings['disable_bone_shape'] = False
+            import_settings['bone_shape_scale_factor'] = 1.0
+            
+            import_settings['import_scene_as_collection'] = True
+            import_settings['import_select_created_objects'] = True
+            import_settings['import_scene_extras'] = True
+            
+            gltf_importer=glTFImporter(mdl_file, import_settings)
+            gltf_importer.data=gltf_from_dict(gltf_data)
+            #self.report({'INFO'}, f"debug: {gltf_importer.data.nodes}")
+            gltf_importer.glb_buffer=giant_buffer
+            BlenderGlTF.create(gltf_importer)
+            
+            bpy.ops.object.select_all(action='DESELECT')
+            collection = bpy.data.collections.get('glTF_not_exported')
+            if not collection is None:
+                bpy.data.collections.remove(collection)
+            for obj in bpy.data.objects:
+                if obj.type == "ARMATURE":
+                    for bone in obj.pose.bones:
+                        bone.custom_shape = None
         
         return {'FINISHED'}
 ########################## Divider ##########################
