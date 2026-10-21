@@ -1006,6 +1006,7 @@ class O_renameMaterial(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.rename_material_png"
     bl_label = "贴图后缀名改成png"
     bl_description = "贴图后缀名改成png并重选来源文件夹"
+    bl_options = {'UNDO'}
     
     directory: bpy.props.StringProperty(
         name="Outdir Path",
@@ -1022,8 +1023,9 @@ class O_renameMaterial(bpy.types.Operator, ImportHelper):
         # ref:https://blender.stackexchange.com/questions/331452/change-fbx-model-texture-path-to-read-png-instead-of-jpg-texture-images/331460#331460
         for img in bpy.data.images:
             if img.source == 'FILE' and not img.is_dirty and not img.library:
-                imgpath = os.path.basename(img.filepath_raw)
+                imgpath = os.path.basename(img.filepath_raw.replace('//','\\'))
                 img.filepath_raw = f"{os.path.splitext(imgpath)[0]}.png"
+                img.name = f"{os.path.splitext(imgpath)[0]}.png"
         # 指定查找丢失数据的路径
         # self.report({'INFO'},f"{self.directory}")
         directory = self.directory
@@ -1057,6 +1059,7 @@ class O_renameMaterialdds(bpy.types.Operator, ImportHelper):
     bl_idname = "fdktools.rename_material_dds"
     bl_label = "贴图后缀名改成dds"
     bl_description = "贴图后缀名改成dds并重选来源文件夹"
+    bl_options = {'UNDO'}
     
     directory: bpy.props.StringProperty(
         name="Outdir Path",
@@ -1073,8 +1076,9 @@ class O_renameMaterialdds(bpy.types.Operator, ImportHelper):
         # ref:https://blender.stackexchange.com/questions/331452/change-fbx-model-texture-path-to-read-png-instead-of-jpg-texture-images/331460#331460
         for img in bpy.data.images:
             if img.source == 'FILE' and not img.is_dirty and not img.library:
-                imgpath = os.path.basename(img.filepath_raw)
+                imgpath = os.path.basename(img.filepath_raw.replace('//','\\'))
                 img.filepath_raw = f"{os.path.splitext(imgpath)[0]}.dds"
+                img.name = f"{os.path.splitext(imgpath)[0]}.dds"
         # 指定查找丢失数据的路径
         # self.report({'INFO'},f"{self.directory}")
         directory = self.directory
