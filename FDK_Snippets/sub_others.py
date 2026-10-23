@@ -1,6 +1,7 @@
 try:
     import bpy,os,json,shutil,mathutils,math,numpy,copy
     from bpy_extras.io_utils import ImportHelper, ExportHelper
+    from mathutils import Vector
 except ModuleNotFoundError as e:
     print("Python module missing! {}".format(e.msg))
     input("Press Enter to abort.")
@@ -383,22 +384,23 @@ class FDK_PT_Snippets_YS9(bpy.types.Panel):
         
         box = layout.box()
         col = box.column(align=True)
-        col.label(text="注意：以下都是全局操作")
+        col.label(text="注意：会影响全部网格")
         
         col = box.column(align=True)
         col.operator(panel.O_del_glTF_not.bl_idname)
         col.operator(panel.O_delEmpty.bl_idname)
-        
-        col = box.column(align=True)
         col.operator(O_removeArmatures.bl_idname)#移除骨架
-        col.operator(O_removeBackfaceCulling.bl_idname)#背面剔除
         col.operator(O_removeAlphaLink.bl_idname)#断开Alpha
-        
-        col = box.column(align=True)
+        col.operator(O_removeBackfaceCulling.bl_idname)#背面剔除
         col.label(text="背面剔除体积光照探头")
         row = col.row()
         row.operator(O_removeBackfaceCullingLight.bl_idname)#背面剔除
         row.operator(O_recoverBackfaceCullingLight.bl_idname)#背面剔除
+        
+        col = box.column(align=True)
+        col.label(text="对选中的网格进行位移")
+        col.operator(O_moveObjects.bl_idname)#將xy坐标移动到邊界框中心
+        col.operator(O_moveObjectsZ.bl_idname)#按活动物体设定z坐标
         
         col = box.column(align=True)
         col.operator(O_removeVERTEXCOLOR.bl_idname)
@@ -487,6 +489,48 @@ class O_removeVERTEXCOLOR(bpy.types.Operator):
             for node in nodes_to_remove:
                 mat.node_tree.nodes.remove(node)
         return {'FINISHED'}
+
+class O_moveObjects(bpy.types.Operator):
+    bl_idname = "fdktools.move_objects"
+    bl_label = "边界框中心移动到坐标原点"
+    bl_description = ""
+    bl_options = {'UNDO'}
+    
+    def execute(self, context):
+        if len(bpy.context.selected_objects)==0:
+            return {'CANCELLED'}
+        selected_objects = bpy.context.selected_objects
+        bbox_center = sum((obj.matrix_world @ Vector(b) for obj in selected_objects for b in obj.bound_box), Vector()) / (8 * len(selected_objects))
+        bbox_center.z=0
+        for obj in selected_objects:
+            obj.location = obj.location-bbox_center
+            #mb = obj.matrix_basis
+            #obj.data.transform(mb)
+            #obj.matrix_basis.identity()
+        return {'FINISHED'}
+        
+class O_moveObjectsZ(bpy.types.Operator):
+    bl_idname = "fdktools.move_objectsz"
+    bl_label = "按活动物体底边对齐到坐标轴"
+    bl_description = ""
+    bl_options = {'UNDO'}
+    
+    def execute(self, context):
+        if len(bpy.context.selected_objects)==0:
+            return {'CANCELLED'}
+        if (bpy.context.active_object is None) or (not bpy.context.active_object.type=="MESH"):
+            return {'CANCELLED'}
+        selected_objects = bpy.context.selected_objects
+        active_obj = bpy.context.active_object
+        bbox_world = [active_obj.matrix_world @ Vector(corner) for corner in active_obj.bound_box]
+        min_z = min(v.z for v in bbox_world)
+        offset = Vector([0,0,min_z])
+        for obj in selected_objects:
+            obj.location = obj.location-offset
+            #mb = obj.matrix_basis
+            #obj.data.transform(mb)
+            #obj.matrix_basis.identity()
+        return {'FINISHED'}
 ########################## Divider ##########################
 classes = [
     FDK_PT_Snippets_FGOA,
@@ -503,6 +547,8 @@ classes = [
     O_removeBackfaceCullingLight,
     O_recoverBackfaceCullingLight,
     O_removeArmatures,
+    O_moveObjects,
+    O_moveObjectsZ,
     O_removeVERTEXCOLOR
 ]
 ########################## Divider ##########################

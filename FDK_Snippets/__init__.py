@@ -1,7 +1,7 @@
 bl_info = {
     "name": "FDK Snippets",
     "author": "",
-    "version": (1, 1, 13),
+    "version": (1, 1, 14),
     "blender": (4, 2, 3),
     "location": "View3D > Tool Shelf >FDK_Snippets Panel",
     "description": "FDK MOD制作 快捷代码集",
@@ -32,6 +32,7 @@ bl_info = {
 #1.1.11:小改进：导入mdl时如果没写后缀，会自动尝试补充mdl后缀，方便直接输入文件名进行导入
 #1.1.12:针对伊苏9模型移植tiny glade，增加快捷操作
 #1.1.13:部分动作增加支持撤销；导入mdl时可以批量选取文件
+#1.1.14:针对伊苏9模型移植tiny glade，增加调整位置相关操作
 ########################## Divider ##########################
 from . import panel, sub_kuro_mdl_tools, sub_others
 
